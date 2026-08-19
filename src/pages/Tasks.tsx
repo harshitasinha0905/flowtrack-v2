@@ -15,6 +15,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createTask, updateTaskStatus } from "../services/taskServices";
 import SelectAllCheckbox from "../components/ui/SelectAllCheckbox";
 import { useAuth } from "../context/AuthContext";
+import { toast } from "sonner";
 const features = tableFeatures({});
 
 const columnHelper = createColumnHelper<typeof features, Task>();
@@ -106,6 +107,26 @@ function Tasks() {
 
     columnHelper.accessor("priority", {
       header: "Priority",
+      cell: ({ getValue }) => {
+        const priority = getValue();
+
+        const priorityStyles = {
+          low: "bg-green-50 text-green-600",
+          medium: "bg-amber-50 text-amber-600",
+          high: "bg-orange-50 text-orange-600",
+          urgent: "bg-red-50 text-red-600",
+        };
+
+        return (
+          <span
+            className={`inline-flex items-center rounded-full px-3 py-1 text-[12px] font-medium capitalize ${
+              priorityStyles[priority]
+            }`}
+          >
+            {priority}
+          </span>
+        );
+      },
     }),
 
     columnHelper.accessor("status", {
@@ -116,7 +137,9 @@ function Tasks() {
 
         if (!permissions.canChangeStatus) {
           return (
-            <span className="capitalize">{task.status.replace("_", " ")}</span>
+            <span className="capitalize rounded-lg border border-zinc-200 bg-slate-100 px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-50 w-full block">
+              {task.status.replace("_", " ")}
+            </span>
           );
         }
 
@@ -131,7 +154,7 @@ function Tasks() {
                 status: e.target.value as Task["status"],
               });
             }}
-            className="cursor-pointer rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="cursor-pointer rounded-lg border border-zinc-200 bg-slate-100 px-1 py-1 text-[12px] text-slate-700 outline-none focus:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <option value="todo">Todo</option>
             <option value="in_progress">In Progress</option>
@@ -144,6 +167,18 @@ function Tasks() {
 
     columnHelper.accessor("due_date", {
       header: "Due",
+      cell: ({ getValue }) => {
+        const date = getValue();
+
+        if (!date) {
+          return "—";
+        }
+
+        return new Date(date).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        });
+      },
     }),
 
     columnHelper.display({
@@ -168,7 +203,7 @@ function Tasks() {
             className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 cursor-pointer border-zinc-200 border"
             aria-label="Edit task"
           >
-            <Pencil size={16} />
+            <Pencil size={14} />
           </button>
         );
       },
@@ -193,6 +228,10 @@ function Tasks() {
       });
       setIsFormOpen(false);
       setSelectedTask(null);
+      toast.success("Task created successfully");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to create task");
     },
   });
 
@@ -206,11 +245,14 @@ function Tasks() {
       });
       setIsFormOpen(false);
       setSelectedTask(null);
+      toast.success("Task updated successfully");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to update task");
     },
   });
 
   // mutation for updating status of the task
-
   const { mutate: updateTaskStatusMutation, isPending: isUpdatingStatus } =
     useMutation({
       mutationFn: ({ id, status }: { id: string; status: Task["status"] }) =>
@@ -219,6 +261,11 @@ function Tasks() {
         queryClient.invalidateQueries({
           queryKey: ["tasks"],
         });
+        toast.success("Task status updated");
+      },
+
+      onError: (error) => {
+        toast.error(error.message || "Failed to update task status");
       },
     });
 
@@ -232,6 +279,10 @@ function Tasks() {
       setDeleteConfirmOpen(false);
       setSelectedTask(null);
       setSelectedTaskIds(new Set());
+      toast.success("Task(s) deleted successfully");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to delete task(s)");
     },
   });
 
@@ -393,7 +444,7 @@ function Tasks() {
         </select>
       </div>
       <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden mt-2">
-        <table className="w-full text-sm">
+        <table className="w-full text-xs">
           <thead className="text-xs text-zinc-500 border-b border-zinc-100 bg-zinc-50/50">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
@@ -422,7 +473,7 @@ function Tasks() {
                 {row.getAllCells().map((cell) => (
                   <td
                     key={cell.id}
-                    className={`px-5 py-4 text-sm text-slate-700 ${
+                    className={`px-3.5 py-4 text-[13px] text-slate-700 ${
                       cell.column.id === "select" ? "w-10" : ""
                     }`}
                   >
