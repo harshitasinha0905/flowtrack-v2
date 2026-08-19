@@ -1,17 +1,24 @@
 import {
   ArrowUpRight,
-  Bell,
-  CalendarDays,
-  CheckCircle2,
+  Clock3,
   CircleAlert,
   CircleCheck,
-  Clock3,
   FolderKanban,
   ListChecks,
   Plus,
   Sparkles,
   Users,
 } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { useQuery } from "@tanstack/react-query";
+import {
+  getDashboardStats,
+  getProjectCompletion,
+  getRecentProjects,
+  getTaskStatusCounts,
+  getUpcomingDeadlines,
+} from "../services/dashboardServices";
+import { useNavigate } from "react-router-dom";
 
 type Stat = {
   label: string;
@@ -30,114 +37,8 @@ type Project = {
   avatarClass: string;
 };
 
-const stats: Stat[] = [
-  {
-    label: "Active projects",
-    value: 6,
-    description: "8 total",
-    icon: FolderKanban,
-  },
-  {
-    label: "Total tasks",
-    value: 53,
-    description: "",
-    icon: ListChecks,
-  },
-  {
-    label: "Completed",
-    value: 11,
-    description: "21% done",
-    icon: CircleCheck,
-  },
-  {
-    label: "Overdue",
-    value: 20,
-    description: "",
-    icon: CircleAlert,
-  },
-  {
-    label: "Team members",
-    value: 10,
-    description: "",
-    icon: Users,
-  },
-];
-
-const projects: Project[] = [
-  {
-    initials: "AW",
-    name: "Aurora Web Platform",
-    company: "Northwind Labs",
-    progress: 0,
-    completedTasks: 0,
-    totalTasks: 7,
-    avatarClass: "bg-indigo-100 text-indigo-600",
-  },
-  {
-    initials: "KM",
-    name: "Kepler Mobile App",
-    company: "Stellar Motors",
-    progress: 0,
-    completedTasks: 0,
-    totalTasks: 7,
-    avatarClass: "bg-purple-100 text-purple-600",
-  },
-  {
-    initials: "HD",
-    name: "Helix Design System",
-    company: "Internal",
-    progress: 33,
-    completedTasks: 2,
-    totalTasks: 6,
-    avatarClass: "bg-emerald-100 text-emerald-600",
-  },
-  {
-    initials: "VA",
-    name: "Vertex Analytics",
-    company: "Delta Retail",
-    progress: 14,
-    completedTasks: 1,
-    totalTasks: 7,
-    avatarClass: "bg-amber-100 text-amber-600",
-  },
-  {
-    initials: "OA",
-    name: "Orion API Gateway",
-    company: "Nimbus Cloud",
-    progress: 14,
-    completedTasks: 1,
-    totalTasks: 7,
-    avatarClass: "bg-rose-100 text-rose-600",
-  },
-  {
-    initials: "MM",
-    name: "Meridian Marketing Site",
-    company: "Bright & Co.",
-    progress: 57,
-    completedTasks: 4,
-    totalTasks: 7,
-    avatarClass: "bg-sky-100 text-sky-600",
-  },
-  {
-    initials: "NA",
-    name: "Nova Analytics",
-    company: "Internal",
-    progress: 36,
-    completedTasks: 3,
-    totalTasks: 8,
-    avatarClass: "bg-blue-100 text-blue-600",
-  },
-  {
-    initials: "AT",
-    name: "Atlas Platform",
-    company: "Northwind Labs",
-    progress: 20,
-    completedTasks: 2,
-    totalTasks: 10,
-    avatarClass: "bg-orange-100 text-orange-600",
-  },
-];
-
+// Temporary hardcoded data.
+// We will make this dynamic later.
 const deadlines = [
   {
     title: "Design onboarding wireframes",
@@ -165,6 +66,8 @@ const deadlines = [
   },
 ];
 
+// Temporary hardcoded data.
+// We will replace this with real activity later.
 const activities = [
   {
     text: "moved 'Prepare launch checklist' to completed",
@@ -200,56 +103,175 @@ const activities = [
   },
 ];
 
-const chartData = [
-  { name: "Aurora", value: 0 },
-  { name: "Kepler", value: 0 },
-  { name: "Helix", value: 32 },
-  { name: "Vertex", value: 14 },
-  { name: "Orion", value: 14 },
-  { name: "Meridian", value: 57 },
-  { name: "Nova", value: 32 },
-  { name: "Atlas", value: 17 },
+const projectAvatarColors = [
+  "bg-indigo-100 text-indigo-600",
+  "bg-purple-100 text-purple-600",
+  "bg-emerald-100 text-emerald-600",
+  "bg-amber-100 text-amber-600",
+  "bg-rose-100 text-rose-600",
+  "bg-sky-100 text-sky-600",
 ];
 
-const taskStatus = [
-  {
-    label: "In Review",
-    value: 9,
-    className: "bg-violet-500",
-  },
-  {
-    label: "In Progress",
-    value: 15,
-    className: "bg-indigo-500",
-  },
-  {
-    label: "Completed",
-    value: 11,
-    className: "bg-emerald-500",
-  },
-  {
-    label: "Testing",
-    value: 5,
-    className: "bg-amber-500",
-  },
-  {
-    label: "Todo",
-    value: 13,
-    className: "bg-slate-400",
-  },
-];
+function getProjectAvatarColor(projectId: string) {
+  const hash = projectId
+    .split("")
+    .reduce((total, char) => total + char.charCodeAt(0), 0);
+
+  return projectAvatarColors[hash % projectAvatarColors.length];
+}
+
+function formatDeadlineDate(date: string) {
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
 
 function Dashboard() {
+  const navigate = useNavigate();
+  const { data: dashboardStats } = useQuery({
+    queryKey: ["dashboard-stats"],
+    queryFn: getDashboardStats,
+  });
+
+  const { data: taskStatusCounts } = useQuery({
+    queryKey: ["dashboard-task-status"],
+    queryFn: getTaskStatusCounts,
+  });
+
+  /*
+   * Summary cards
+   */
+  const stats: Stat[] = [
+    {
+      label: "Active projects",
+      value: dashboardStats?.activeProjects ?? 0,
+      description: `${dashboardStats?.totalProjects ?? 0} total`,
+      icon: FolderKanban,
+    },
+    {
+      label: "Total tasks",
+      value: dashboardStats?.totalTasks ?? 0,
+      description: "",
+      icon: ListChecks,
+    },
+    {
+      label: "Completed",
+      value: dashboardStats?.completedTasks ?? 0,
+      description:
+        dashboardStats && dashboardStats.totalTasks > 0
+          ? `${Math.round(
+              (dashboardStats.completedTasks / dashboardStats.totalTasks) * 100,
+            )}% done`
+          : "0% done",
+      icon: CircleCheck,
+    },
+    {
+      label: "Overdue",
+      value: dashboardStats?.overdueTasks ?? 0,
+      description: "",
+      icon: CircleAlert,
+    },
+    {
+      label: "Team members",
+      value: dashboardStats?.teamMembers ?? 0,
+      description: "",
+      icon: Users,
+    },
+  ];
+
+  /*
+   * Task status legend
+   */
+  const taskStatus = [
+    {
+      label: "In Review",
+      value: taskStatusCounts?.review ?? 0,
+      className: "bg-purple-500",
+    },
+    {
+      label: "In Progress",
+      value: taskStatusCounts?.in_progress ?? 0,
+      className: "bg-indigo-500",
+    },
+    {
+      label: "Completed",
+      value: taskStatusCounts?.done ?? 0,
+      className: "bg-emerald-500",
+    },
+    {
+      label: "Todo",
+      value: taskStatusCounts?.todo ?? 0,
+      className: "bg-zinc-400",
+    },
+  ];
+
+  /*
+   * Total tasks for the donut center
+   */
+  const totalStatusTasks =
+    (taskStatusCounts?.todo ?? 0) +
+    (taskStatusCounts?.in_progress ?? 0) +
+    (taskStatusCounts?.review ?? 0) +
+    (taskStatusCounts?.done ?? 0);
+
+  /*
+   * Recharts data
+   */
+  const taskStatusChartData = [
+    {
+      name: "In Review",
+      value: taskStatusCounts?.review ?? 0,
+      color: "#a855f7",
+    },
+    {
+      name: "In Progress",
+      value: taskStatusCounts?.in_progress ?? 0,
+      color: "#6366f1",
+    },
+    {
+      name: "Completed",
+      value: taskStatusCounts?.done ?? 0,
+      color: "#10b981",
+    },
+    {
+      name: "Todo",
+      value: taskStatusCounts?.todo ?? 0,
+      color: "#a1a1aa",
+    },
+  ];
+
+  // Project Completion Value
+  const { data: projectCompletion } = useQuery({
+    queryKey: ["dashboard-project-completion"],
+    queryFn: getProjectCompletion,
+  });
+
+  const chartData =
+    projectCompletion?.map((project) => ({
+      name: project.name,
+      value: project.completion,
+    })) ?? [];
+
+  // Recent 6 projects
+  const { data: recentProjects } = useQuery({
+    queryKey: ["dashboard-recent-projects"],
+    queryFn: getRecentProjects,
+  });
+
+  // Upcomming deadlines
+
+  const { data: upcomingDeadlines } = useQuery({
+    queryKey: ["dashboard-upcomming-deadlines"],
+    queryFn: getUpcomingDeadlines,
+  });
+
   return (
     <div className="min-h-full px-6 py-8">
       <div className="mx-auto max-w-7xl space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            {/* <p className="mb-2 text-[10px] font-medium uppercase tracking-[0.2em] text-slate-400">
-              Overview
-            </p> */}
-
             <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
               Dashboard
             </h1>
@@ -258,7 +280,8 @@ function Dashboard() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+              className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 cursor-pointer"
+              onClick={() => navigate("/projects?create=true")}
             >
               <Plus size={14} />
               New project
@@ -311,7 +334,7 @@ function Dashboard() {
         </div>
 
         {/* Charts */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_245px]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_290px]">
           {/* Project completion */}
           <div className="rounded-xl border border-slate-200 bg-white p-5">
             <div>
@@ -327,16 +350,15 @@ function Dashboard() {
             <div className="mt-6 flex h-52">
               {/* Y axis */}
               <div className="flex w-8 flex-col justify-between pb-7 pt-1 text-[10px] text-slate-400">
-                <span>60</span>
-                <span>45</span>
-                <span>30</span>
-                <span>15</span>
-                <span>0</span>
+                <span>100%</span>
+                <span>75%</span>
+                <span>50%</span>
+                <span>25%</span>
+                <span>0%</span>
               </div>
 
               {/* Chart */}
               <div className="relative flex flex-1 items-end gap-3 border-b border-slate-100">
-                {/* Horizontal grid lines */}
                 <div className="pointer-events-none absolute inset-x-0 top-0 border-t border-slate-100" />
                 <div className="pointer-events-none absolute inset-x-0 top-1/4 border-t border-slate-100" />
                 <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-slate-100" />
@@ -348,16 +370,14 @@ function Dashboard() {
                     className="relative flex h-full flex-1 flex-col justify-end"
                   >
                     <div
-                      className="relative z-10 w-full rounded-t-md bg-indigo-500 transition-opacity hover:opacity-80"
+                      className="relative z-10 w-full origin-bottom rounded-t-md bg-indigo-500 transition-opacity duration-200 hover:opacity-80"
                       style={{
-                        height:
-                          item.value === 0
-                            ? "0%"
-                            : `${(item.value / 60) * 100}%`,
+                        height: `${item.value}%`,
+                        animation: "growBar 800ms ease-out both",
                       }}
                     />
 
-                    <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] text-slate-400">
+                    <span className="absolute -bottom-5 left-1/2 max-w-full -translate-x-1/2 truncate text-[9px] text-slate-400">
                       {item.name}
                     </span>
                   </div>
@@ -376,18 +396,33 @@ function Dashboard() {
               Task status
             </h2>
 
-            <div className="mt-5 flex justify-center">
-              <div
-                className="relative flex h-28 w-28 items-center justify-center rounded-full"
-                style={{
-                  background:
-                    "conic-gradient(#8b5cf6 0deg 61deg, #6366f1 61deg 176deg, #10b981 176deg 251deg, #f59e0b 251deg 285deg, #9ca3af 285deg 360deg)",
-                }}
-              >
-                <div className="h-16 w-16 rounded-full bg-white" />
-              </div>
+            {/* Donut */}
+            <div className="relative mt-5 h-36 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={taskStatusChartData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={68}
+                    paddingAngle={3}
+                    stroke="white"
+                    strokeWidth={2}
+                  >
+                    {taskStatusChartData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+
+              {/* Center value */}
             </div>
 
+            {/* Status counts */}
             <div className="mt-5 space-y-2">
               {taskStatus.map((item) => (
                 <div
@@ -410,7 +445,7 @@ function Dashboard() {
         </div>
 
         {/* Projects + Deadlines */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_245px]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_290px]">
           {/* Recent projects */}
           <div className="rounded-xl border border-slate-200 bg-white p-5">
             <div className="mb-4 flex items-center justify-between">
@@ -420,33 +455,42 @@ function Dashboard() {
 
               <button
                 type="button"
-                className="text-[10px] font-medium text-violet-600 hover:text-violet-700"
+                onClick={() => navigate("/projects")}
+                className="text-[12px] font-medium text-violet-600 hover:text-violet-700 cursor-pointer
+                hover:underline hover:underline-offset-1"
               >
                 View all
               </button>
             </div>
 
             <div className="space-y-2">
-              {projects.slice(0, 6).map((project) => (
+              {(recentProjects ?? []).map((project) => (
                 <div
-                  key={project.name}
+                  key={project.id}
                   className="flex items-center gap-3 rounded-xl border border-slate-100 px-2.5 py-2"
                 >
-                  {/* Avatar */}
+                  {/* Project avatar */}
                   <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold ${project.avatarClass}`}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[10px] font-semibold ${getProjectAvatarColor(
+                      project.id,
+                    )}`}
                   >
-                    {project.initials}
+                    {project.name
+                      .split(" ")
+                      .map((word: string[]) => word[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
                   </div>
 
-                  {/* Project */}
+                  {/* Project information */}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[11px] font-semibold text-slate-900">
                       {project.name}
                     </p>
 
                     <p className="mt-0.5 truncate text-[9px] text-slate-500">
-                      {project.company}
+                      {project.description || "No description"}
                     </p>
                   </div>
 
@@ -472,30 +516,35 @@ function Dashboard() {
           </div>
 
           {/* Upcoming deadlines */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <h2 className="text-sm font-medium text-slate-900">
+          <div className="rounded-xl border border-slate-200 bg-white p-6">
+            <h2 className="text-lg font-display font-semibold tracking-tight text-slate-700">
               Upcoming deadlines
             </h2>
 
-            <div className="mt-4 space-y-4">
-              {deadlines.map((deadline) => (
-                <div key={deadline.title} className="flex gap-3">
+            <div className="mt-5 space-y-4">
+              {(upcomingDeadlines ?? []).map((deadline) => (
+                <div key={deadline.id} className="flex items-start gap-4">
                   <Clock3
-                    size={14}
-                    className="mt-0.5 shrink-0 text-slate-400"
+                    size={18}
+                    strokeWidth={1.8}
+                    className="mt-1 shrink-0 text-slate-400"
                   />
 
                   <div className="min-w-0">
-                    <p className="text-[11px] font-medium leading-4 text-slate-800">
+                    <p className="text-sm font-medium leading-6 text-slate-900">
                       {deadline.title}
                     </p>
 
-                    <p className="mt-0.5 text-[9px] text-slate-400">
-                      {deadline.date}
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formatDeadlineDate(deadline.due_date!)}
                     </p>
                   </div>
                 </div>
               ))}
+
+              {(upcomingDeadlines ?? []).length === 0 && (
+                <p className="text-sm text-slate-400">No upcoming deadlines.</p>
+              )}
             </div>
           </div>
         </div>

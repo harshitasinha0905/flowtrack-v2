@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, Plus, Filter } from "lucide-react";
 
@@ -11,9 +11,13 @@ import Modal from "../components/ui/Modal";
 import CreateProjectForm from "../components/project/CreateProjectForm";
 import ProjectCard from "../components/project/ProjectCard";
 import type { Project } from "../types/project";
+import { useSearchParams } from "react-router-dom";
 
 function Projects() {
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [isFormOpen, setIsFormOpen] = useState(
+    searchParams.get("create") === "true",
+  );
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
@@ -227,6 +231,7 @@ function Projects() {
         <Modal
           onClose={() => {
             setIsFormOpen(false);
+            setSearchParams({});
             setSelectedProject(null);
           }}
         >
@@ -234,6 +239,7 @@ function Projects() {
             project={selectedProject ?? undefined}
             onClose={() => {
               setIsFormOpen(false);
+              setSearchParams({});
               setSelectedProject(null);
             }}
           />

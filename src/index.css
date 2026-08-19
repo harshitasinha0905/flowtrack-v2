@@ -22,3 +22,13 @@ body {
   background: var(--color-background);
   color: var(--color-text);
 }
+
+@keyframes growBar {
+  from {
+    transform: scaleY(0);
+  }
+
+  to {
+    transform: scaleY(1);
+  }
+}

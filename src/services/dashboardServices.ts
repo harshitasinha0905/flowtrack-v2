@@ -52,3 +52,123 @@ export async function getDashboardStats() {
     teamMembers: teamMembers ?? 0,
   };
 }
+
+export async function getTaskStatusCounts() {
+  const { data, error } = await supabase.from("tasks").select("status");
+
+  if (error) {
+    throw new Error("Task status counts could not be loaded");
+  }
+
+  return {
+    todo: data.filter((task) => task.status === "todo").length,
+    in_progress: data.filter((task) => task.status === "in_progress").length,
+    review: data.filter((task) => task.status === "review").length,
+    done: data.filter((task) => task.status === "done").length,
+  };
+}
+
+export async function getProjectCompletion() {
+  const { data, error } = await supabase
+    .from("projects")
+    .select(
+      `
+      id,
+      name,
+      tasks (
+        id,
+        status
+      )
+    `,
+    )
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error("Project completion could not be loaded");
+  }
+
+  return data.map((project) => {
+    const totalTasks = project.tasks?.length ?? 0;
+
+    const completedTasks =
+      project.tasks?.filter((task) => task.status === "done").length ?? 0;
+
+    const completion =
+      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    return {
+      id: project.id,
+      name: project.name,
+      completion,
+    };
+  });
+}
+
+export async function getRecentProjects() {
+  const { data, error } = await supabase
+    .from("projects")
+    .select(
+      `
+      id,
+      name,
+      description,
+      status,
+      created_at,
+      tasks (
+        id,
+        status
+      )
+    `,
+    )
+    .order("created_at", { ascending: false })
+    .limit(6);
+
+  if (error) {
+    throw new Error("Recent projects could not be loaded");
+  }
+
+  return data.map((project) => {
+    const totalTasks = project.tasks?.length ?? 0;
+
+    const completedTasks =
+      project.tasks?.filter((task) => task.status === "done").length ?? 0;
+
+    const progress =
+      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    return {
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      status: project.status,
+      progress,
+      completedTasks,
+      totalTasks,
+    };
+  });
+}
+
+export async function getUpcomingDeadlines() {
+  const today = new Date().toISOString().split("T")[0];
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(
+      `
+      id,
+      title,
+      due_date,
+      projects(name)
+    `,
+    )
+    .not("due_date", "is", null)
+    .gte("due_date", today)
+    .order("due_date", { ascending: true })
+    .limit(6);
+
+  if (error) {
+    throw new Error("Upcoming deadlines could not be loaded");
+  }
+
+  return data;
+}
