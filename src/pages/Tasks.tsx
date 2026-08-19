@@ -4,11 +4,11 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { Search, Plus, Delete, Trash, Trash2 } from "lucide-react";
+import { Search, Plus, Trash2, Pencil } from "lucide-react";
 
 import { deleteTasks, getTasks, updateTask } from "../services/taskServices";
 import type { CreateTaskData, Task } from "../types/task";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Modal from "../components/ui/Modal";
 import CreateTaskForm from "../components/task/CreateTaskForm";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +33,18 @@ function Tasks() {
   const [sortByFilter, setSortByFilter] = useState("sort_by_due_date");
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
+
+  const getTaskPermissions = (task: Task) => {
+    const isAdmin = profile?.role === "admin";
+    const isCreator = task.created_by === user?.id;
+    const isAssignee = task.assigned_to === user?.id;
+
+    return {
+      canEdit: isAdmin || isCreator,
+      canDelete: isAdmin || isCreator,
+      canChangeStatus: isAdmin || isCreator || isAssignee,
+    };
+  };
 
   // Columns for task table
   const columns = columnHelper.columns([
@@ -98,10 +110,68 @@ function Tasks() {
 
     columnHelper.accessor("status", {
       header: "Status",
+      cell: ({ row }) => {
+        const task = row.original;
+        const permissions = getTaskPermissions(task);
+
+        if (!permissions.canChangeStatus) {
+          return (
+            <span className="capitalize">{task.status.replace("_", " ")}</span>
+          );
+        }
+
+        return (
+          <select
+            value={task.status}
+            disabled={isUpdatingStatus}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              updateTaskStatusMutation({
+                id: task.id,
+                status: e.target.value as Task["status"],
+              });
+            }}
+            className="cursor-pointer rounded-md border border-zinc-200 bg-white px-2 py-1 text-sm text-slate-700 outline-none focus:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="todo">Todo</option>
+            <option value="in_progress">In Progress</option>
+            <option value="review">Review</option>
+            <option value="done">Done</option>
+          </select>
+        );
+      },
     }),
 
     columnHelper.accessor("due_date", {
       header: "Due",
+    }),
+
+    columnHelper.display({
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const task = row.original;
+        const permissions = getTaskPermissions(task);
+
+        if (!permissions.canEdit) {
+          return null;
+        }
+
+        return (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedTask(task);
+              setIsFormOpen(true);
+            }}
+            className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 cursor-pointer border-zinc-200 border"
+            aria-label="Edit task"
+          >
+            <Pencil size={16} />
+          </button>
+        );
+      },
     }),
   ]);
 
@@ -139,6 +209,19 @@ function Tasks() {
     },
   });
 
+  // mutation for updating status of the task
+
+  const { mutate: updateTaskStatusMutation, isPending: isUpdatingStatus } =
+    useMutation({
+      mutationFn: ({ id, status }: { id: string; status: Task["status"] }) =>
+        updateTaskStatus(id, status),
+      onSuccess: () => {
+        queryClient.invalidateQueries({
+          queryKey: ["tasks"],
+        });
+      },
+    });
+
   // mutations for deleting multiple tasks
   const { mutate: deleteTasksMutation, isPending: isDeleting } = useMutation({
     mutationFn: (taskIds: string[]) => deleteTasks(taskIds),
@@ -163,7 +246,7 @@ function Tasks() {
     },
   );
 
-  const TASK_STATUSES = ["todo", "in_progress", "review", "completed"] as const;
+  const TASK_STATUSES = ["todo", "in_progress", "review", "done"] as const;
 
   const TASK_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 
@@ -207,18 +290,6 @@ function Tasks() {
         return 0;
       }
     });
-
-  const getTaskPermissions = (task: Task) => {
-    const isAdmin = profile?.role === "admin";
-    const isCreator = task.created_by === user?.id;
-    const isAssignee = task.assigned_to === user?.id;
-
-    return {
-      canEdit: isAdmin || isCreator,
-      canDelete: isAdmin || isCreator,
-      canChangeStatus: isAdmin || isCreator || isAssignee,
-    };
-  };
 
   const table = useTable({
     features,
@@ -346,17 +417,7 @@ function Tasks() {
             {table.getRowModel().rows.map((row) => (
               <tr
                 key={row.id}
-                onClick={() => {
-                  const permissions = getTaskPermissions(row.original);
-                  if (!permissions.canEdit) return;
-                  setSelectedTask(row.original);
-                  setIsFormOpen(true);
-                }}
-                className={`border-b border-slate-100 last:border-b-0 ${
-                  getTaskPermissions(row.original).canEdit
-                    ? "cursor-pointer hover:bg-zinc-50"
-                    : ""
-                }`}
+                className="border-b border-slate-100 last:border-b-0"
               >
                 {row.getAllCells().map((cell) => (
                   <td
