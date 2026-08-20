@@ -19,6 +19,7 @@ import {
   getUpcomingDeadlines,
 } from "../services/dashboardServices";
 import { useNavigate } from "react-router-dom";
+import { getRecentActivity } from "../services/activityServices";
 
 type Stat = {
   label: string;
@@ -66,42 +67,92 @@ const deadlines = [
   },
 ];
 
-// Temporary hardcoded data.
-// We will replace this with real activity later.
-const activities = [
-  {
-    text: "moved 'Prepare launch checklist' to completed",
-    date: "7 days ago",
-  },
-  {
-    text: "moved 'Write RFC: search revamp' to in_progress",
-    date: "7 days ago",
-  },
-  {
-    text: "moved 'Update dependencies' to todo",
-    date: "7 days ago",
-  },
-  {
-    text: "moved 'Write onboarding docs' to in_progress",
-    date: "7 days ago",
-  },
-  {
-    text: "commented on 'Design onboarding wireframes'",
-    date: "7 days ago",
-  },
-  {
-    text: "created project TEST_UI_137276",
-    date: "7 days ago",
-  },
-  {
-    text: "created project TEST_Project",
-    date: "7 days ago",
-  },
-  {
-    text: "moved 'TEST_Task_notif' to in_progress",
-    date: "7 days ago",
-  },
-];
+// Activity Formatting
+
+function formatActivity(activity: {
+  action: string;
+  entity_type: string;
+  metadata: Record<string, unknown>;
+}) {
+  const title = activity.metadata?.title as string | undefined;
+  const name = activity.metadata?.name as string | undefined;
+
+  if (activity.entity_type === "project") {
+    if (activity.action === "created") {
+      return `created project "${name ?? "Unknown project"}"`;
+    }
+
+    if (activity.action === "updated") {
+      return `updated project "${name ?? "Unknown project"}"`;
+    }
+
+    if (activity.action === "deleted") {
+      return `deleted project "${name ?? "Unknown project"}"`;
+    }
+  }
+
+  if (activity.entity_type === "task") {
+    if (activity.action === "created") {
+      return `created task "${title ?? "Unknown task"}"`;
+    }
+
+    if (activity.action === "updated") {
+      return `updated task "${title ?? "Unknown task"}"`;
+    }
+
+    if (activity.action === "deleted") {
+      return `deleted task "${title ?? "Unknown task"}"`;
+    }
+
+    if (activity.action === "status_changed") {
+      const oldStatus = activity.metadata?.old_status as string | undefined;
+      const newStatus = activity.metadata?.new_status as string | undefined;
+
+      return `moved "${title ?? "Unknown task"}" from ${oldStatus ?? "unknown"} to ${newStatus ?? "unknown"}`;
+    }
+  }
+
+  if (activity.entity_type === "comment") {
+    if (activity.action === "commented") {
+      return `commented on a task`;
+    }
+
+    if (activity.action === "updated") {
+      return `updated a comment`;
+    }
+
+    if (activity.action === "deleted") {
+      return `deleted a comment`;
+    }
+  }
+
+  if (activity.entity_type === "project_member") {
+    if (activity.action === "member_added") {
+      return "added a member to a project";
+    }
+
+    if (activity.action === "member_removed") {
+      return "removed a member from a project";
+    }
+
+    if (activity.action === "member_role_changed") {
+      return "changed a project member's role";
+    }
+  }
+
+  return "performed an action";
+}
+
+// Time formatter for activity
+
+function formatActivityTime(date: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(date));
+}
 
 const projectAvatarColors = [
   "bg-indigo-100 text-indigo-600",
@@ -266,6 +317,13 @@ function Dashboard() {
     queryFn: getUpcomingDeadlines,
   });
 
+  // Activity Timeline
+
+  const { data: recentActivity } = useQuery({
+    queryKey: ["dashboard-recent-activities"],
+    queryFn: getRecentActivity,
+  });
+
   return (
     <div className="min-h-full px-6 py-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -338,18 +396,18 @@ function Dashboard() {
           {/* Project completion */}
           <div className="rounded-xl border border-slate-200 bg-white p-5">
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-slate-400">
+              <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
                 Progress
               </p>
 
-              <h2 className="mt-1 text-sm font-medium text-slate-900">
+              <h2 className=" text-lg font-semibold text-slate-900">
                 Project completion
               </h2>
             </div>
 
             <div className="mt-6 flex h-52">
               {/* Y axis */}
-              <div className="flex w-8 flex-col justify-between pb-7 pt-1 text-[10px] text-slate-400">
+              <div className="flex w-8 flex-col justify-between pb-7 pt-1 text-[11px] text-slate-400">
                 <span>100%</span>
                 <span>75%</span>
                 <span>50%</span>
@@ -377,7 +435,7 @@ function Dashboard() {
                       }}
                     />
 
-                    <span className="absolute -bottom-5 left-1/2 max-w-full -translate-x-1/2 truncate text-[9px] text-slate-400">
+                    <span className="absolute -bottom-5 left-1/2 max-w-full -translate-x-1/2 truncate text-[11px] text-slate-400">
                       {item.name}
                     </span>
                   </div>
@@ -388,11 +446,11 @@ function Dashboard() {
 
           {/* Task status */}
           <div className="rounded-xl border border-slate-200 bg-white p-5">
-            <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-slate-400">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">
               Breakdown
             </p>
 
-            <h2 className="mt-1 text-sm font-medium text-slate-900">
+            <h2 className="mt-1 text-lg font-semibold text-slate-900">
               Task status
             </h2>
 
@@ -427,7 +485,7 @@ function Dashboard() {
               {taskStatus.map((item) => (
                 <div
                   key={item.label}
-                  className="flex items-center justify-between text-[10px]"
+                  className="flex items-center justify-between text-xs"
                 >
                   <div className="flex items-center gap-2">
                     <span
@@ -449,7 +507,7 @@ function Dashboard() {
           {/* Recent projects */}
           <div className="rounded-xl border border-slate-200 bg-white p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-medium text-slate-900">
+              <h2 className="text-lg font-display font-semibold text-slate-900">
                 Recent projects
               </h2>
 
@@ -485,11 +543,11 @@ function Dashboard() {
 
                   {/* Project information */}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[11px] font-semibold text-slate-900">
+                    <p className="truncate text-sm font-medium text-zinc-900">
                       {project.name}
                     </p>
 
-                    <p className="mt-0.5 truncate text-[9px] text-slate-500">
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
                       {project.description || "No description"}
                     </p>
                   </div>
@@ -550,23 +608,36 @@ function Dashboard() {
         </div>
 
         {/* Activity */}
-        <div className="rounded-xl border border-slate-200 bg-white p-5">
-          <h2 className="text-sm font-medium text-slate-900">Activity</h2>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">
+            Activity
+          </h2>
 
-          <div className="mt-4 space-y-3">
-            {activities.map((activity, index) => (
-              <div key={`${activity.text}-${index}`} className="flex gap-3">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
+          <div className="mt-3 space-y-5">
+            {(recentActivity ?? []).map((activity) => (
+              <div key={activity.id} className="flex items-start gap-3">
+                {/* Timeline dot */}
+                <span className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500" />
 
-                <div>
-                  <p className="text-[11px] text-slate-700">{activity.text}</p>
+                {/* Activity */}
+                <div className="min-w-0">
+                  <p className="text-sm font-normal leading-6 text-slate-900">
+                    <span className="font-medium">
+                      {activity.profiles?.full_name ?? "Unknown user"}
+                    </span>{" "}
+                    {formatActivity(activity)}
+                  </p>
 
-                  <p className="mt-0.5 text-[9px] text-slate-400">
-                    {activity.date}
+                  <p className="mt-0 text-[11px] text-slate-400">
+                    {formatActivityTime(activity.created_at)}
                   </p>
                 </div>
               </div>
             ))}
+
+            {(recentActivity ?? []).length === 0 && (
+              <p className="text-sm text-slate-400">No recent activity.</p>
+            )}
           </div>
         </div>
       </div>

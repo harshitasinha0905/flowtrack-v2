@@ -1,6 +1,6 @@
 set local check_function_bodies = off;
 
-drop policy "Users can view their own profile" on "public"."profiles";
+drop policy if exists "Users can view their own profile" on "public"."profiles";
 
 alter table "public"."tasks"
   add column "created_by" uuid;
