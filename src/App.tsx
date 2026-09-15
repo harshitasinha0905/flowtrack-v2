@@ -1,5 +1,3 @@
-// Supabase password - e*!ZFAW6Rvq%4U&
-
 import AppRoutes from "./routes/AppRoutes";
 import { Toaster } from "sonner";
 

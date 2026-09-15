@@ -1,38 +1,59 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   createColumnHelper,
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
+
 import { Search, Plus, Trash2, Pencil } from "lucide-react";
 
-import { deleteTasks, getTasks, updateTask } from "../services/taskServices";
-import type { CreateTaskData, Task } from "../types/task";
 import { useState } from "react";
+
+import {
+  deleteTasks,
+  getTasks,
+  updateTaskStatus,
+} from "../services/taskServices";
+
+import type { Task } from "../types/task";
+
 import Modal from "../components/ui/Modal";
 import CreateTaskForm from "../components/task/CreateTaskForm";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createTask, updateTaskStatus } from "../services/taskServices";
 import SelectAllCheckbox from "../components/ui/SelectAllCheckbox";
+
 import { useAuth } from "../context/AuthContext";
+
 import { toast } from "sonner";
+
+import { invalidateTaskRelatedQueries } from "../utils/queryInvalidations";
+
 const features = tableFeatures({});
 
 const columnHelper = createColumnHelper<typeof features, Task>();
 
 function Tasks() {
   const [isFormOpen, setIsFormOpen] = useState(false);
+
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(
     new Set(),
   );
+
   const [isDeleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
   const [searchTask, setSearchTask] = useState("");
+
   const [projectSelection, setProjectSelection] = useState("all_projects");
+
   const [statusSelection, setStatusSelection] = useState("all_statuses");
+
   const [prioritySelection, setPrioritySelection] = useState("all_priorities");
+
   const [sortByFilter, setSortByFilter] = useState("sort_by_due_date");
+
   const { user, profile } = useAuth();
+
   const queryClient = useQueryClient();
 
   const getTaskPermissions = (task: Task) => {
@@ -47,10 +68,25 @@ function Tasks() {
     };
   };
 
-  // Columns for task table
+  /*
+   * Fetch tasks
+   */
+  const {
+    data: tasks = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["tasks"],
+    queryFn: getTasks,
+  });
+
+  /*
+   * Columns
+   */
   const columns = columnHelper.columns([
     columnHelper.display({
       id: "select",
+
       header: () => (
         <SelectAllCheckbox
           checked={tasks?.length > 0 && tasks?.length === selectedTaskIds.size}
@@ -60,30 +96,35 @@ function Tasks() {
           onChange={(e) => {
             setSelectedTaskIds((prev) => {
               const newSet = new Set(prev);
+
               if (e.target.checked) {
                 tasks?.forEach((task) => newSet.add(task.id));
               } else {
                 newSet.clear();
               }
+
               return newSet;
             });
           }}
         />
       ),
+
       cell: ({ row }) => (
         <input
           type="checkbox"
-          className="h-3.5 w-3.5 rounded border-slate-300 cursor-pointer"
+          className="h-3.5 w-3.5 cursor-pointer rounded border-slate-300"
           checked={selectedTaskIds.has(row.original.id)}
           onClick={(e) => e.stopPropagation()}
           onChange={() => {
             setSelectedTaskIds((prev) => {
               const next = new Set(prev);
+
               if (next.has(row.original.id)) {
                 next.delete(row.original.id);
               } else {
                 next.add(row.original.id);
               }
+
               return next;
             });
           }}
@@ -107,6 +148,7 @@ function Tasks() {
 
     columnHelper.accessor("priority", {
       header: "Priority",
+
       cell: ({ getValue }) => {
         const priority = getValue();
 
@@ -131,13 +173,15 @@ function Tasks() {
 
     columnHelper.accessor("status", {
       header: "Status",
+
       cell: ({ row }) => {
         const task = row.original;
+
         const permissions = getTaskPermissions(task);
 
         if (!permissions.canChangeStatus) {
           return (
-            <span className="capitalize rounded-lg border border-zinc-200 bg-slate-100 px-2 py-1 text-[12px] text-slate-700 outline-none focus:border-zinc-400 disabled:cursor-not-allowed disabled:opacity-50 w-full block">
+            <span className="block w-full rounded-lg border border-zinc-200 bg-slate-100 px-2 py-1 text-[12px] capitalize text-slate-700 outline-none">
               {task.status.replace("_", " ")}
             </span>
           );
@@ -167,6 +211,7 @@ function Tasks() {
 
     columnHelper.accessor("due_date", {
       header: "Due",
+
       cell: ({ getValue }) => {
         const date = getValue();
 
@@ -183,9 +228,12 @@ function Tasks() {
 
     columnHelper.display({
       id: "actions",
+
       header: "Actions",
+
       cell: ({ row }) => {
         const task = row.original;
+
         const permissions = getTaskPermissions(task);
 
         if (!permissions.canEdit) {
@@ -197,10 +245,11 @@ function Tasks() {
             type="button"
             onClick={(e) => {
               e.stopPropagation();
+
               setSelectedTask(task);
               setIsFormOpen(true);
             }}
-            className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 cursor-pointer border-zinc-200 border"
+            className="cursor-pointer rounded-md border border-zinc-200 p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
             aria-label="Edit task"
           >
             <Pencil size={14} />
@@ -210,57 +259,17 @@ function Tasks() {
     }),
   ]);
 
-  const {
-    data: tasks = [],
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ["tasks"],
-    queryFn: getTasks,
-  });
-
-  // mutation for creating task
-  const { mutate: createTaskMutation, isPending: isCreating } = useMutation({
-    mutationFn: (task: CreateTaskData) => createTask(task),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["tasks"],
-      });
-      setIsFormOpen(false);
-      setSelectedTask(null);
-      toast.success("Task created successfully");
-    },
-    onError: (error) => {
-      toast.error(error.message || "Failed to create task");
-    },
-  });
-
-  // mutation for updating task
-  const { mutate: updateTaskMutation, isPending: isUpdating } = useMutation({
-    mutationFn: ({ id, task }: { id: string; task: Partial<CreateTaskData> }) =>
-      updateTask(id, task),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["tasks"],
-      });
-      setIsFormOpen(false);
-      setSelectedTask(null);
-      toast.success("Task updated successfully");
-    },
-    onError: (error) => {
-      toast.error(error.message || "Failed to update task");
-    },
-  });
-
-  // mutation for updating status of the task
+  /*
+   * Mutation for updating task status
+   */
   const { mutate: updateTaskStatusMutation, isPending: isUpdatingStatus } =
     useMutation({
       mutationFn: ({ id, status }: { id: string; status: Task["status"] }) =>
         updateTaskStatus(id, status),
+
       onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: ["tasks"],
-        });
+        invalidateTaskRelatedQueries(queryClient);
+
         toast.success("Task status updated");
       },
 
@@ -269,30 +278,36 @@ function Tasks() {
       },
     });
 
-  // mutations for deleting multiple tasks
+  /*
+   * Mutation for deleting multiple tasks
+   */
   const { mutate: deleteTasksMutation, isPending: isDeleting } = useMutation({
     mutationFn: (taskIds: string[]) => deleteTasks(taskIds),
+
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["tasks"],
-      });
+      invalidateTaskRelatedQueries(queryClient);
+
       setDeleteConfirmOpen(false);
       setSelectedTask(null);
       setSelectedTaskIds(new Set());
+
       toast.success("Task(s) deleted successfully");
     },
+
     onError: (error) => {
       toast.error(error.message || "Failed to delete task(s)");
     },
   });
 
-  // Unique projects from tasks
-
+  /*
+   * Unique projects from tasks
+   */
   const uniqueProjectTasks = (tasks ?? []).filter(
     (currentTask, currentIndex, originalTaskArray) => {
       const firstMatchingIndex = originalTaskArray.findIndex((item) => {
         return item.project_id === currentTask.project_id;
       });
+
       return currentIndex === firstMatchingIndex;
     },
   );
@@ -308,7 +323,9 @@ function Tasks() {
     low: 1,
   };
 
-  // Filtered Task
+  /*
+   * Filtered tasks
+   */
   const filteredTasks = (tasks ?? [])
     .filter((task) => {
       const basicCheck = task.title
@@ -330,18 +347,22 @@ function Tasks() {
     })
     .sort((a, b) => {
       if (sortByFilter === "sort_by_due_date" && a.due_date && b.due_date) {
-        return (
-          new Date(a?.due_date).getTime() - new Date(b?.due_date).getTime()
-        );
-      } else if (sortByFilter === "sort_by_priority") {
+        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+      }
+
+      if (sortByFilter === "sort_by_priority") {
         const weightA = priorityWeights[a.priority] ?? 0;
         const weightB = priorityWeights[b.priority] ?? 0;
+
         return weightB - weightA;
-      } else {
-        return 0;
       }
+
+      return 0;
     });
 
+  /*
+   * Table
+   */
   const table = useTable({
     features,
     data: filteredTasks ?? [],
@@ -349,7 +370,8 @@ function Tasks() {
   });
 
   return (
-    <div className="space-y-6 min-h-full px-4.5 py-5">
+    <div className="min-h-full space-y-6 px-4.5 py-5">
+      {/* Header */}
       <div className="mb-7 flex items-start justify-between">
         <div>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">
@@ -360,15 +382,16 @@ function Tasks() {
         <div className="flex gap-2">
           {selectedTaskIds.size > 0 && (
             <button
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-red-200 text-red-600 text-sm bg-red-50 hover:bg-red-100 cursor-pointer"
+              className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-sm text-red-600 hover:bg-red-100"
               onClick={() => setDeleteConfirmOpen(true)}
             >
               <Trash2 size={16} />
               Delete ({selectedTaskIds.size})
             </button>
           )}
+
           <button
-            className="inline-flex items-center gap-2 h-9 px-3 rounded-[11px] bg-zinc-900 text-white text-sm hover:bg-zinc-800 cursor-pointer"
+            className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-[11px] bg-zinc-900 px-3 text-sm text-white hover:bg-zinc-800"
             onClick={() => {
               setIsFormOpen(true);
               setSelectedTask(null);
@@ -379,8 +402,10 @@ function Tasks() {
           </button>
         </div>
       </div>
+
+      {/* Filters */}
       <div className="mb-7 flex items-center gap-3">
-        <div className="relative flex-3 max-w-md">
+        <div className="relative max-w-md flex-3">
           <input
             type="text"
             placeholder="Search tasks"
@@ -396,11 +421,12 @@ function Tasks() {
         </div>
 
         <select
-          className="cursor-pointer flex-1 h-9 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-zinc-300"
+          className="h-9 flex-1 cursor-pointer rounded-xl border border-zinc-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-zinc-300"
           value={projectSelection}
           onChange={(e) => setProjectSelection(e.target.value)}
         >
           <option value="all_projects">All projects</option>
+
           {uniqueProjectTasks.map((project) => (
             <option key={project.project_id} value={project.project_id}>
               {project?.projects?.name}
@@ -409,11 +435,12 @@ function Tasks() {
         </select>
 
         <select
-          className="cursor-pointer h-9 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-zinc-300"
+          className="h-9 cursor-pointer rounded-xl border border-zinc-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-zinc-300"
           value={statusSelection}
           onChange={(e) => setStatusSelection(e.target.value)}
         >
           <option value="all_statuses">All statuses</option>
+
           {TASK_STATUSES.map((status) => (
             <option key={status} value={status}>
               {status}
@@ -422,11 +449,12 @@ function Tasks() {
         </select>
 
         <select
-          className="cursor-pointer h-9 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-zinc-300"
+          className="h-9 cursor-pointer rounded-xl border border-zinc-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-zinc-300"
           value={prioritySelection}
           onChange={(e) => setPrioritySelection(e.target.value)}
         >
           <option value="all_priorities">All priorities</option>
+
           {TASK_PRIORITIES.map((priority) => (
             <option key={priority} value={priority}>
               {priority}
@@ -435,17 +463,20 @@ function Tasks() {
         </select>
 
         <select
-          className="cursor-pointer h-9 rounded-xl border border-zinc-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-zinc-300"
+          className="h-9 cursor-pointer rounded-xl border border-zinc-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-zinc-300"
           value={sortByFilter}
           onChange={(e) => setSortByFilter(e.target.value)}
         >
           <option value="sort_by_due_date">Sort by due date</option>
+
           <option value="sort_by_priority">Sort by priority</option>
         </select>
       </div>
-      <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden mt-2">
+
+      {/* Table */}
+      <div className="mt-2 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
         <table className="w-full text-xs">
-          <thead className="text-xs text-zinc-500 border-b border-zinc-100 bg-zinc-50/50">
+          <thead className="border-b border-zinc-100 bg-zinc-50/50 text-xs text-zinc-500">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
@@ -485,20 +516,27 @@ function Tasks() {
           </tbody>
         </table>
 
+        {/* Create/Edit Task Modal */}
         {isFormOpen && (
-          <Modal className="max-w-2xl" onClose={() => setIsFormOpen(false)}>
+          <Modal
+            className="max-w-2xl"
+            onClose={() => {
+              setIsFormOpen(false);
+              setSelectedTask(null);
+            }}
+          >
             <CreateTaskForm
               onClose={() => {
                 setIsFormOpen(false);
                 setSelectedTask(null);
               }}
-              createTask={createTaskMutation}
               mode={selectedTask ? "edit" : "create"}
               task={selectedTask}
-              updateTask={(id, task) => updateTaskMutation({ id, task })}
             />
           </Modal>
         )}
+
+        {/* Delete Confirmation */}
         {isDeleteConfirmOpen && (
           <Modal onClose={() => setDeleteConfirmOpen(false)}>
             <div>

@@ -22,6 +22,54 @@ export async function getTasks(): Promise<Task[]> {
   return tasks;
 }
 
+export async function getTaskStats(projectId: string) {
+  const [
+    { count: totalTasks, error: totalTaskError },
+    { count: completedTasks, error: completedTaskError },
+  ] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("project_id", projectId),
+
+    supabase
+      .from("tasks")
+      .select("*", { count: "exact", head: true })
+      .eq("project_id", projectId)
+      .eq("status", "done"),
+  ]);
+
+  if (totalTaskError || completedTaskError) {
+    throw new Error("Task stats could not be loaded");
+  }
+
+  return {
+    totalTasks: totalTasks ?? 0,
+    completedTasks: completedTasks ?? 0,
+  };
+}
+
+export async function getTasksByProject(projectId: string) {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(
+      `
+      *,
+      profiles:assigned_to (
+        full_name
+      )
+    `,
+    )
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error("Project tasks could not be loaded");
+  }
+
+  return data;
+}
+
 export async function createTask(task: CreateTaskData): Promise<Task> {
   const {
     data: { user },
@@ -97,4 +145,27 @@ export async function deleteTasks(taskIds: string[]) {
   if (error) {
     throw new Error("Tasks could not be deleted");
   }
+}
+
+export async function searchTasks(searchTerm: string) {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(`
+      id,
+      title,
+      status,
+      priority,
+      project_id,
+      projects (
+        name
+      )
+    `)
+    .ilike("title", `%${searchTerm}%`)
+    .limit(5);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
 }

@@ -11,10 +11,12 @@ import Modal from "../components/ui/Modal";
 import CreateProjectForm from "../components/project/CreateProjectForm";
 import ProjectCard from "../components/project/ProjectCard";
 import type { Project } from "../types/project";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { dashboardQueryKeys } from "../utils/queryKeys";
 
 function Projects() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [isFormOpen, setIsFormOpen] = useState(
     searchParams.get("create") === "true",
   );
@@ -48,6 +50,22 @@ function Projects() {
       queryClient.invalidateQueries({
         queryKey: ["projects"],
       });
+
+      queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.stats,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.projectCompletion,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.recentProjects,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.recentActivities,
+      });
     },
   });
 
@@ -57,6 +75,22 @@ function Projects() {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["projects"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.stats,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.projectCompletion,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.recentProjects,
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: dashboardQueryKeys.recentActivities,
       });
 
       setProjectToDelete(null);
@@ -205,6 +239,7 @@ function Projects() {
                     }}
                     onArchive={(project) => archiveProject(project)}
                     onDelete={(project) => setProjectToDelete(project)}
+                    onClick={() => navigate(`/projects/${project.id}`)}
                   />
                 ))}
               </div>

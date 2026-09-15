@@ -1,15 +1,18 @@
 import { MoreHorizontal, Pencil, Archive, Trash2 } from "lucide-react";
-import type { Project } from "../../types/project";
+import type { Project, ProjectWithStats } from "../../types/project";
 import { useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getProjects } from "../../services/projectServices";
 
 type ProjectCardProps = {
-  project: Project;
+  project: ProjectWithStats;
   isMenuOpen: boolean;
   onMenuToggle: () => void;
   onMenuClose: () => void;
   onEdit: (project: Project) => void;
   onArchive: (project: Project) => void;
   onDelete: (project: Project) => void;
+  onClick: () => void;
 };
 
 function getInitials(name: string) {
@@ -29,6 +32,7 @@ function ProjectCard({
   onEdit,
   onArchive,
   onDelete,
+  onClick,
 }: ProjectCardProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -50,13 +54,16 @@ function ProjectCard({
 
   const initials = getInitials(project.name);
 
-  // Temporary values until Tasks/Team are connected.
-  const progress = 0;
-  const completedTasks = 0;
-  const totalTasks = 0;
+  const completedTasks = project.completedTasks;
+  const totalTasks = project.totalTasks;
+  const progress =
+    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 transition-shadow hover:shadow-sm">
+    <div
+      className="rounded-xl border border-slate-200 bg-white p-5 cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
+      onClick={onClick}
+    >
       {/* Top */}
       <div className="flex items-start justify-between">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-100 text-sm font-semibold text-violet-700">
@@ -66,7 +73,10 @@ function ProjectCard({
         <div ref={menuRef} className="relative">
           <button
             type="button"
-            onClick={onMenuToggle}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMenuToggle();
+            }}
             className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
             aria-label={`Actions for ${project.name}`}
           >
@@ -78,7 +88,8 @@ function ProjectCard({
               {/* Edit */}
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   onMenuToggle();
                   onEdit(project);
                 }}
@@ -91,7 +102,8 @@ function ProjectCard({
               {/* Archive */}
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   onMenuToggle();
                   onArchive(project);
                 }}
@@ -106,7 +118,8 @@ function ProjectCard({
               {/* Delete */}
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   onMenuToggle();
                   onDelete(project);
                 }}
@@ -127,7 +140,7 @@ function ProjectCard({
         </h2>
 
         <p className="mt-1 truncate text-xs text-slate-500">
-          {project.description || "No description"}
+          {project.client_name || ""}
         </p>
       </div>
 

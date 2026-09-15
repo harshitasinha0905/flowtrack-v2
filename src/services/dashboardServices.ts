@@ -112,6 +112,7 @@ export async function getRecentProjects() {
       id,
       name,
       description,
+      client_name,
       status,
       created_at,
       tasks (
@@ -140,6 +141,7 @@ export async function getRecentProjects() {
       id: project.id,
       name: project.name,
       description: project.description,
+      client_name: project.client_name,
       status: project.status,
       progress,
       completedTasks,

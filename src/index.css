@@ -32,3 +32,9 @@ body {
     transform: scaleY(1);
   }
 }
+
+.ai-gradient-text {
+  background: linear-gradient(90deg, #6366f1, #a855f7);
+  background-clip: text;
+  color: #0000;
+}

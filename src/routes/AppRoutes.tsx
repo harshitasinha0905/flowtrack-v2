@@ -6,9 +6,10 @@ import AppLayout from "../layouts/AppLayout";
 import Dashboard from "../pages/Dashboard";
 import Projects from "../pages/Projects";
 import Tasks from "../pages/Tasks";
-import Team from "../pages/Team";
+import Team from "../pages/Teams";
 import Login from "../pages/Login";
 import NotFoundPage from "../pages/NotFoundPage";
+import ProjectDetails from "../pages/ProjectDetails";
 
 export default function AppRoutes() {
   return (
@@ -21,6 +22,7 @@ export default function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/projects" element={<Projects />} />
+          <Route path="/projects/:projectId" element={<ProjectDetails />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/team" element={<Team />} />
         </Route>

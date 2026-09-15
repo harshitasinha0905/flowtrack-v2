@@ -8,6 +8,7 @@ import {
   Plus,
   Sparkles,
   Users,
+  Loader2,
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useQuery } from "@tanstack/react-query";
@@ -20,6 +21,13 @@ import {
 } from "../services/dashboardServices";
 import { useNavigate } from "react-router-dom";
 import { getRecentActivity } from "../services/activityServices";
+import { dashboardQueryKeys } from "../utils/queryKeys";
+import {
+  generateSprintSummary,
+  type SprintSummaryResponse,
+} from "../services/aiServices";
+import { useState } from "react";
+import { getProjects, getProjectSprintData } from "../services/projectServices";
 
 type Stat = {
   label: string;
@@ -37,35 +45,6 @@ type Project = {
   totalTasks: number;
   avatarClass: string;
 };
-
-// Temporary hardcoded data.
-// We will make this dynamic later.
-const deadlines = [
-  {
-    title: "Design onboarding wireframes",
-    date: "Jul 31",
-  },
-  {
-    title: "Set up feature flags",
-    date: "Jul 31",
-  },
-  {
-    title: "Setup CI/CD pipelines",
-    date: "Aug 1",
-  },
-  {
-    title: "Write RFC: search revamp",
-    date: "Aug 1",
-  },
-  {
-    title: "Instrument error monitoring",
-    date: "Aug 2",
-  },
-  {
-    title: "Redesign settings page",
-    date: "Aug 3",
-  },
-];
 
 // Activity Formatting
 
@@ -179,14 +158,19 @@ function formatDeadlineDate(date: string) {
 }
 
 function Dashboard() {
+  const [isSprintSummaryOpen, setIsSprintSummaryOpen] = useState(false);
+  const [sprintSummary, setSprintSummary] =
+    useState<SprintSummaryResponse | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const navigate = useNavigate();
   const { data: dashboardStats } = useQuery({
-    queryKey: ["dashboard-stats"],
+    queryKey: dashboardQueryKeys.stats,
     queryFn: getDashboardStats,
   });
 
   const { data: taskStatusCounts } = useQuery({
-    queryKey: ["dashboard-task-status"],
+    queryKey: dashboardQueryKeys.taskStatus,
     queryFn: getTaskStatusCounts,
   });
 
@@ -294,7 +278,7 @@ function Dashboard() {
 
   // Project Completion Value
   const { data: projectCompletion } = useQuery({
-    queryKey: ["dashboard-project-completion"],
+    queryKey: dashboardQueryKeys.projectCompletion,
     queryFn: getProjectCompletion,
   });
 
@@ -304,25 +288,104 @@ function Dashboard() {
       value: project.completion,
     })) ?? [];
 
+  // Get All Projects
+  const { data: allProjects } = useQuery({
+    queryKey: ["projects"],
+    queryFn: getProjects,
+  });
+
   // Recent 6 projects
   const { data: recentProjects } = useQuery({
-    queryKey: ["dashboard-recent-projects"],
+    queryKey: dashboardQueryKeys.recentProjects,
     queryFn: getRecentProjects,
+  });
+
+  // Get AI Sprint data
+
+  const {
+    data: selectedProjectTasks,
+    isLoading: isLoadingProjectTasks,
+    error: projectTasksError,
+  } = useQuery({
+    queryKey: ["project-sprint-data", selectedProjectId],
+    queryFn: () => getProjectSprintData(selectedProjectId),
+    enabled: !!selectedProjectId,
   });
 
   // Upcomming deadlines
 
   const { data: upcomingDeadlines } = useQuery({
-    queryKey: ["dashboard-upcomming-deadlines"],
+    queryKey: dashboardQueryKeys.upcomingDeadlines,
     queryFn: getUpcomingDeadlines,
   });
 
   // Activity Timeline
 
   const { data: recentActivity } = useQuery({
-    queryKey: ["dashboard-recent-activities"],
+    queryKey: dashboardQueryKeys.recentActivities,
     queryFn: getRecentActivity,
   });
+
+  async function handleSprintSummary() {
+    if (!selectedProjectId) {
+      return;
+    }
+
+    setIsGeneratingSummary(true);
+
+    try {
+      const projectTasks = selectedProjectTasks ?? [];
+      const today = new Date();
+
+      const sprintTasks = projectTasks.map(function (task) {
+        const isOverdue =
+          Boolean(task.due_date) &&
+          new Date(task.due_date) < today &&
+          task.status !== "done";
+
+        return {
+          title: task.title,
+          status: task.status,
+          priority: task.priority,
+          dueDate: task.due_date,
+          assignee: task.profiles?.[0]?.full_name ?? "Unassigned",
+          isOverdue,
+        };
+      });
+
+      const result = await generateSprintSummary({
+        totalTasks: projectTasks.length,
+
+        completedTasks: projectTasks.filter(function (task) {
+          return task.status === "done";
+        }).length,
+
+        inProgressTasks: projectTasks.filter(function (task) {
+          return task.status === "in_progress";
+        }).length,
+
+        reviewTasks: projectTasks.filter(function (task) {
+          return task.status === "review";
+        }).length,
+
+        todoTasks: projectTasks.filter(function (task) {
+          return task.status === "todo";
+        }).length,
+
+        overdueTasks: sprintTasks.filter(function (task) {
+          return task.isOverdue;
+        }).length,
+
+        tasks: sprintTasks,
+      });
+
+      setSprintSummary(result);
+    } catch (error) {
+      console.error("Sprint summary failed:", error);
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  }
 
   return (
     <div className="min-h-full px-6 py-8">
@@ -347,7 +410,8 @@ function Dashboard() {
 
             <button
               type="button"
-              className="flex h-9 items-center gap-2 rounded-lg bg-violet-600 px-3 text-xs font-medium text-white transition hover:bg-violet-700"
+              className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-medium text-white hover:bg-violet-700 cursor-pointer bg-linear-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-[filter]"
+              onClick={() => setIsSprintSummaryOpen(true)}
             >
               <Sparkles size={14} />
               AI Sprint Summary
@@ -548,7 +612,7 @@ function Dashboard() {
                     </p>
 
                     <p className="mt-0.5 truncate text-xs text-slate-500">
-                      {project.description || "No description"}
+                      {project.client_name || ""}
                     </p>
                   </div>
 
@@ -637,6 +701,156 @@ function Dashboard() {
 
             {(recentActivity ?? []).length === 0 && (
               <p className="text-sm text-slate-400">No recent activity.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={`fixed inset-0 z-50 flex justify-end ${
+          isSprintSummaryOpen ? "pointer-events-auto" : "pointer-events-none"
+        }`}
+      >
+        <div
+          className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${
+            isSprintSummaryOpen ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setIsSprintSummaryOpen(false)}
+        />
+
+        <div
+          className={`relative h-full w-full max-w-md bg-white shadow-xl transition-transform duration-300 ease-in-out overflow-hidden overflow-y-auto ${
+            isSprintSummaryOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <div className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center text-purple-500 gap-2">
+              <Sparkles size={15} />
+              <h2 className="ai-gradient-text text-lg font-semibold text-slate-900">
+                AI Sprint Summary
+              </h2>
+
+              {/* <p className="mt-1 text-sm text-slate-500">
+                Select a project to generate an AI summary.
+              </p> */}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsSprintSummaryOpen(false)}
+              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+            >
+              ×
+            </button>
+          </div>
+
+          <div className="p-4 pt-1">
+            <label className="mb-2 block text-xs font-medium text-slate-700">
+              Project
+            </label>
+
+            <select
+              value={selectedProjectId}
+              onChange={(event) => setSelectedProjectId(event.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+            >
+              <option value="">Select a project</option>
+
+              {allProjects?.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={handleSprintSummary}
+              disabled={!selectedProjectId || isGeneratingSummary}
+              className="flex items-center justify-center gap-2 mt-4 w-full rounded-lg px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed text-white bg-linear-to-r from-indigo-600 to-purple-600 hover:brightness-110 disabled:opacity-50 cursor-pointer"
+            >
+              {isGeneratingSummary ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  {" "}
+                  <Sparkles size={14} />
+                  Generate Summary
+                </>
+              )}
+            </button>
+            {!sprintSummary && (
+              <div className="text-xs mt-3 text-zinc-500 border border-dashed border-zinc-200 rounded-xl p-4">
+                This will analyze the project's tasks and produce a professional
+                summary including completed work, tasks needing attention, key
+                risks, and recommended next steps.
+              </div>
+            )}
+            {sprintSummary && (
+              <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                {/* <p className="whitespace-pre-wrap text-sm text-slate-700"></p> */}
+                {sprintSummary && (
+                  <div className="mt-6 space-y-5">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Overall Status
+                      </h3>
+                      <p className="mt-1 text-sm text-gray-600">
+                        {sprintSummary.overallStatus}
+                      </p>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        What’s Going Well
+                      </h3>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-600">
+                        {sprintSummary.goingWell.map(function (item, index) {
+                          return <li key={index}>{item}</li>;
+                        })}
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Needs Attention
+                      </h3>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-600">
+                        {sprintSummary.needsAttention.map(
+                          function (item, index) {
+                            return <li key={index}>{item}</li>;
+                          },
+                        )}
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Key Risks
+                      </h3>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-600">
+                        {sprintSummary.risks.map(function (item, index) {
+                          return <li key={index}>{item}</li>;
+                        })}
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Recommended Actions
+                      </h3>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-600">
+                        {sprintSummary.nextActions.map(function (item, index) {
+                          return <li key={index}>{item}</li>;
+                        })}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
