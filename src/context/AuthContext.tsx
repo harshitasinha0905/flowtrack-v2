@@ -3,11 +3,12 @@ import {
   login as loginUser,
   logout as logoutUser,
   getCurrentUser,
+  signup as signupUser,
 } from "../services/authServices";
 
 import { supabase } from "../lib/supabase";
 
-import type { User } from "@supabase/supabase-js";
+import type { User, Session } from "@supabase/supabase-js";
 import { getCurrentProfile } from "../services/profileServices";
 import type { Profile } from "../types/profile";
 
@@ -16,6 +17,14 @@ type AuthContextType = {
   loading: boolean;
   profile: Profile | null;
   login: (email: string, password: string) => Promise<void>;
+  signup: (
+    email: string,
+    password: string,
+    fullName: string,
+  ) => Promise<{
+    user: User | null;
+    session: Session | null;
+  }>;
   logout: () => Promise<void>;
 };
 
@@ -64,12 +73,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function logout() {
     await logoutUser();
   }
+  async function signup(email: string, password: string, fullName: string) {
+    return await signupUser(email, password, fullName);
+  }
   return (
     <AuthContext.Provider
       value={{
         user,
         loading,
         login,
+        signup,
         logout,
         profile,
       }}

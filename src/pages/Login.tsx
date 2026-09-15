@@ -4,7 +4,7 @@ import FormField from "../components/ui/FormField";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 
@@ -90,6 +90,15 @@ function Login() {
             {isSubmitting ? "Signing in..." : "Sign In"}
           </Button>
         </form>
+        <p className="mt-6 text-center text-sm text-slate-500">
+          Don't have an account?{" "}
+          <Link
+            to="/signup"
+            className="font-medium text-violet-600 transition-colors hover:text-violet-700"
+          >
+            Sign up
+          </Link>
+        </p>
       </Card>
     </main>
   );

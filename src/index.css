@@ -23,6 +23,11 @@ body {
   color: var(--color-text);
 }
 
+button,
+a {
+  cursor: pointer;
+}
+
 @keyframes growBar {
   from {
     transform: scaleY(0);

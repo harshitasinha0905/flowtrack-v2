@@ -10,12 +10,14 @@ import Team from "../pages/Teams";
 import Login from "../pages/Login";
 import NotFoundPage from "../pages/NotFoundPage";
 import ProjectDetails from "../pages/ProjectDetails";
+import Signup from "../pages/SignUp";
 
 export default function AppRoutes() {
   return (
     <Routes>
       {/* Public routes */}
       <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
 
       {/* Protected routes */}
       <Route element={<ProtectedRoute />}>
