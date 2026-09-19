@@ -10,10 +10,10 @@ function App() {
         richColors
         toastOptions={{
           classNames: {
-            toast: "ml-10 !w-[250px] !h-[50px] !justify-center",
+            toast: "!w-[320px] !h-[64px] !justify-center",
             content: "!text-center",
-            title: "!text-center",
-            description: "!text-center",
+            title: "!text-left",
+            description: "!text-left",
             success: "bg-black! text-white! border-black!",
           },
         }}

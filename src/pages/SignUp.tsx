@@ -46,22 +46,26 @@ function Signup() {
   async function onSubmit(data: SignupFormData) {
     try {
       const result = await signup(data.email, data.password, data.fullName);
-
       if (result.session) {
-        toast.success("Account created successfully!");
+        toast.success("Account created successfully!", {
+          description: "Welcome to FlowTrack!",
+        });
         navigate("/");
         return;
       }
-
-      toast.success(
-        "Account created! Please check your email to verify your account.",
-      );
+      toast.success("Check your email", {
+        description:
+          "We've sent a confirmation link to your email. Please verify your email to continue.",
+        duration: 6000,
+      });
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Unable to create your account. Please try again.",
-      );
+      toast.error("Unable to create your account", {
+        description:
+          error instanceof Error
+            ? error.message
+            : "Something went wrong. Please try again.",
+        duration: 5000,
+      });
     }
   }
 

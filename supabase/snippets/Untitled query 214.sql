@@ -1,3 +1,3 @@
-select pg_get_functiondef(
-  'public.handle_new_user()'::regprocedure
-);
+SELECT *
+FROM public.tasks
+ORDER BY created_at;
