@@ -1,11 +1,12 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import LoadingScreen from "../components/ui/LoadingScreen";
 
 function ProtectedRoute() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <h1>Loading...</h1>;
+    return <LoadingScreen />;
   }
 
   if (!user) {

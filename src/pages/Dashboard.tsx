@@ -28,6 +28,7 @@ import {
 } from "../services/aiServices";
 import { useState } from "react";
 import { getProjects, getProjectSprintData } from "../services/projectServices";
+import DashboardSkeleton from "../components/skeletons/DashboardSkeleton";
 
 type Stat = {
   label: string;
@@ -164,12 +165,15 @@ function Dashboard() {
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const navigate = useNavigate();
-  const { data: dashboardStats } = useQuery({
-    queryKey: dashboardQueryKeys.stats,
-    queryFn: getDashboardStats,
-  });
 
-  const { data: taskStatusCounts } = useQuery({
+  const { data: dashboardStats, isLoading: isDashboardStatsLoading } = useQuery(
+    {
+      queryKey: dashboardQueryKeys.stats,
+      queryFn: getDashboardStats,
+    },
+  );
+
+  const { data: taskStatusCounts, isLoading: isTaskStatusLoading } = useQuery({
     queryKey: dashboardQueryKeys.taskStatus,
     queryFn: getTaskStatusCounts,
   });
@@ -277,10 +281,11 @@ function Dashboard() {
   ];
 
   // Project Completion Value
-  const { data: projectCompletion } = useQuery({
-    queryKey: dashboardQueryKeys.projectCompletion,
-    queryFn: getProjectCompletion,
-  });
+  const { data: projectCompletion, isLoading: isProjectCompletionLoading } =
+    useQuery({
+      queryKey: dashboardQueryKeys.projectCompletion,
+      queryFn: getProjectCompletion,
+    });
 
   const chartData =
     projectCompletion?.map((project) => ({
@@ -289,19 +294,20 @@ function Dashboard() {
     })) ?? [];
 
   // Get All Projects
-  const { data: allProjects } = useQuery({
+  const { data: allProjects, isLoading: isProjectsLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: getProjects,
   });
 
   // Recent 6 projects
-  const { data: recentProjects } = useQuery({
-    queryKey: dashboardQueryKeys.recentProjects,
-    queryFn: getRecentProjects,
-  });
+  const { data: recentProjects, isLoading: isRecentProjectsLoading } = useQuery(
+    {
+      queryKey: dashboardQueryKeys.recentProjects,
+      queryFn: getRecentProjects,
+    },
+  );
 
   // Get AI Sprint data
-
   const {
     data: selectedProjectTasks,
     isLoading: isLoadingProjectTasks,
@@ -314,17 +320,29 @@ function Dashboard() {
 
   // Upcomming deadlines
 
-  const { data: upcomingDeadlines } = useQuery({
-    queryKey: dashboardQueryKeys.upcomingDeadlines,
-    queryFn: getUpcomingDeadlines,
-  });
+  const { data: upcomingDeadlines, isLoading: isUpcomingDeadlinesLoading } =
+    useQuery({
+      queryKey: dashboardQueryKeys.upcomingDeadlines,
+      queryFn: getUpcomingDeadlines,
+    });
 
   // Activity Timeline
 
-  const { data: recentActivity } = useQuery({
-    queryKey: dashboardQueryKeys.recentActivities,
-    queryFn: getRecentActivity,
-  });
+  const { data: recentActivity, isLoading: isRecentActivityLoading } = useQuery(
+    {
+      queryKey: dashboardQueryKeys.recentActivities,
+      queryFn: getRecentActivity,
+    },
+  );
+
+  const isDashboardLoading =
+    isDashboardStatsLoading ||
+    isTaskStatusLoading ||
+    isProjectCompletionLoading ||
+    isProjectsLoading ||
+    isRecentProjectsLoading ||
+    isUpcomingDeadlinesLoading ||
+    isRecentActivityLoading;
 
   async function handleSprintSummary() {
     if (!selectedProjectId) {
@@ -385,6 +403,10 @@ function Dashboard() {
     } finally {
       setIsGeneratingSummary(false);
     }
+  }
+
+  if (isDashboardLoading) {
+    return <DashboardSkeleton />;
   }
 
   return (
