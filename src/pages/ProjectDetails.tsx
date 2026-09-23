@@ -41,7 +41,7 @@ import {
   generateSprintSummary,
   type SprintSummaryResponse,
 } from "../services/aiServices";
-import LoadingScreen from "../components/ui/LoadingScreen";
+import ProjectDetailsSkeleton from "../components/skeletons/ProjectDetailsSkeleton";
 
 function getInitials(name: string) {
   return name
@@ -510,7 +510,7 @@ function ProjectDetails() {
    * Loading / error states
    */
   if (isProjectLoading) {
-    return <LoadingScreen />;
+    return <ProjectDetailsSkeleton />;
   }
 
   if (error || !project) {
