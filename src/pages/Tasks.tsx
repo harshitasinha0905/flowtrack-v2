@@ -1,13 +1,25 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   createColumnHelper,
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
 
-import { Search, Plus, Trash2, Pencil } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Trash2,
+  Pencil,
+  LucideChevronLeft,
+  LucideChevronRight,
+} from "lucide-react";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   deleteTasks,
@@ -26,31 +38,27 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 
 import { invalidateTaskRelatedQueries } from "../utils/queryInvalidations";
+import { getProjects } from "../services/projectServices";
 
 const features = tableFeatures({});
 
 const columnHelper = createColumnHelper<typeof features, Task>();
 
 function Tasks() {
+  const TASKS_PER_PAGE = 10;
+
   const [isFormOpen, setIsFormOpen] = useState(false);
-
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(
     new Set(),
   );
-
   const [isDeleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-
   const [searchTask, setSearchTask] = useState("");
-
   const [projectSelection, setProjectSelection] = useState("all_projects");
-
   const [statusSelection, setStatusSelection] = useState("all_statuses");
-
   const [prioritySelection, setPrioritySelection] = useState("all_priorities");
-
   const [sortByFilter, setSortByFilter] = useState("sort_by_due_date");
+  const [page, setPage] = useState(1);
 
   const { user, profile } = useAuth();
 
@@ -72,17 +80,57 @@ function Tasks() {
    * Fetch tasks
    */
   const {
-    data: tasks = [],
+    data: taskData,
     isLoading,
+    isFetching,
     error,
   } = useQuery({
-    queryKey: ["tasks"],
-    queryFn: getTasks,
+    queryKey: [
+      "tasks",
+      page,
+      searchTask,
+      projectSelection,
+      statusSelection,
+      prioritySelection,
+      sortByFilter,
+    ],
+    queryFn: function fetchTasks() {
+      return getTasks({
+        page,
+        pageSize: TASKS_PER_PAGE,
+        search: searchTask,
+        projectId:
+          projectSelection === "all_projects" ? undefined : projectSelection,
+        status:
+          statusSelection === "all_statuses"
+            ? undefined
+            : (statusSelection as Task["status"]),
+        priority:
+          prioritySelection === "all_priorities"
+            ? undefined
+            : (prioritySelection as Task["priority"]),
+        sortBy: sortByFilter === "sort_by_priority" ? "priority" : "due_date",
+      });
+    },
+    placeholderData: keepPreviousData,
   });
 
-  /*
-   * Columns
-   */
+  const tasks = taskData?.tasks ?? [];
+  const totalCount = taskData?.totalCount ?? 0;
+
+  const totalPages = Math.ceil(totalCount / TASKS_PER_PAGE);
+
+  const startItem = totalCount === 0 ? 0 : (page - 1) * TASKS_PER_PAGE + 1;
+
+  const endItem = Math.min(page * TASKS_PER_PAGE, totalCount);
+
+  // Get Projects Data
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects"],
+    queryFn: getProjects,
+  });
+
+  // Columns
   const columns = columnHelper.columns([
     columnHelper.display({
       id: "select",
@@ -259,9 +307,7 @@ function Tasks() {
     }),
   ]);
 
-  /*
-   * Mutation for updating task status
-   */
+  // Mutation for updating task status
   const { mutate: updateTaskStatusMutation, isPending: isUpdatingStatus } =
     useMutation({
       mutationFn: ({ id, status }: { id: string; status: Task["status"] }) =>
@@ -278,9 +324,7 @@ function Tasks() {
       },
     });
 
-  /*
-   * Mutation for deleting multiple tasks
-   */
+  // Mutation for deleting multiple tasks
   const { mutate: deleteTasksMutation, isPending: isDeleting } = useMutation({
     mutationFn: (taskIds: string[]) => deleteTasks(taskIds),
 
@@ -299,73 +343,71 @@ function Tasks() {
     },
   });
 
-  /*
-   * Unique projects from tasks
-   */
-  const uniqueProjectTasks = (tasks ?? []).filter(
-    (currentTask, currentIndex, originalTaskArray) => {
-      const firstMatchingIndex = originalTaskArray.findIndex((item) => {
-        return item.project_id === currentTask.project_id;
-      });
+  // Unique projects from tasks (Not required anymore, moved th logic on server side)
 
-      return currentIndex === firstMatchingIndex;
-    },
-  );
+  // const uniqueProjectTasks = (tasks ?? []).filter(
+  //   (currentTask, currentIndex, originalTaskArray) => {
+  //     const firstMatchingIndex = originalTaskArray.findIndex((item) => {
+  //       return item.project_id === currentTask.project_id;
+  //     });
+
+  //     return currentIndex === firstMatchingIndex;
+  //   },
+  // );
 
   const TASK_STATUSES = ["todo", "in_progress", "review", "done"] as const;
 
   const TASK_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
 
-  const priorityWeights = {
-    urgent: 4,
-    high: 3,
-    medium: 2,
-    low: 1,
-  };
+  // const priorityWeights = {
+  //   urgent: 4,
+  //   high: 3,
+  //   medium: 2,
+  //   low: 1,
+  // };
 
-  /*
-   * Filtered tasks
-   */
-  const filteredTasks = (tasks ?? [])
-    .filter((task) => {
-      const basicCheck = task.title
-        .toLowerCase()
-        .includes(searchTask.toLowerCase());
+  //  Filtered tasks (Not required anymore)
 
-      const projectCheck =
-        projectSelection === "all_projects" ||
-        task.project_id === projectSelection;
+  // const filteredTasks = (tasks ?? [])
+  //   .filter((task) => {
+  //     const basicCheck = task.title
+  //       .toLowerCase()
+  //       .includes(searchTask.toLowerCase());
 
-      const statusCheck =
-        statusSelection === "all_statuses" || task.status === statusSelection;
+  //     const projectCheck =
+  //       projectSelection === "all_projects" ||
+  //       task.project_id === projectSelection;
 
-      const priorityCheck =
-        prioritySelection === "all_priorities" ||
-        task.priority === prioritySelection;
+  //     const statusCheck =
+  //       statusSelection === "all_statuses" || task.status === statusSelection;
 
-      return basicCheck && projectCheck && statusCheck && priorityCheck;
-    })
-    .sort((a, b) => {
-      if (sortByFilter === "sort_by_due_date" && a.due_date && b.due_date) {
-        return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
-      }
+  //     const priorityCheck =
+  //       prioritySelection === "all_priorities" ||
+  //       task.priority === prioritySelection;
 
-      if (sortByFilter === "sort_by_priority") {
-        const weightA = priorityWeights[a.priority] ?? 0;
-        const weightB = priorityWeights[b.priority] ?? 0;
+  //     return basicCheck && projectCheck && statusCheck && priorityCheck;
+  //   })
+  //   .sort((a, b) => {
+  //     if (sortByFilter === "sort_by_due_date" && a.due_date && b.due_date) {
+  //       return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+  //     }
 
-        return weightB - weightA;
-      }
+  //     if (sortByFilter === "sort_by_priority") {
+  //       const weightA = priorityWeights[a.priority] ?? 0;
+  //       const weightB = priorityWeights[b.priority] ?? 0;
 
-      return 0;
-    });
+  //       return weightB - weightA;
+  //     }
+
+  //     return 0;
+  //   });
 
   /*
    * Table
    */
   const table = useTable({
     features,
-    data: filteredTasks ?? [],
+    data: tasks,
     columns,
   });
 
@@ -411,7 +453,10 @@ function Tasks() {
             placeholder="Search tasks"
             className="h-9 w-full rounded-xl border border-zinc-200 bg-white px-4 pl-11 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-zinc-300"
             value={searchTask}
-            onChange={(e) => setSearchTask(e.target.value)}
+            onChange={function handleSearchChange(event) {
+              setSearchTask(event.target.value);
+              setPage(1);
+            }}
           />
 
           <Search
@@ -423,13 +468,16 @@ function Tasks() {
         <select
           className="h-9 flex-1 cursor-pointer rounded-xl border border-zinc-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-zinc-300"
           value={projectSelection}
-          onChange={(e) => setProjectSelection(e.target.value)}
+          onChange={function handleProjectChange(event) {
+            setProjectSelection(event.target.value);
+            setPage(1);
+          }}
         >
           <option value="all_projects">All projects</option>
 
-          {uniqueProjectTasks.map((project) => (
-            <option key={project.project_id} value={project.project_id}>
-              {project?.projects?.name}
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
             </option>
           ))}
         </select>
@@ -437,7 +485,10 @@ function Tasks() {
         <select
           className="h-9 cursor-pointer rounded-xl border border-zinc-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-zinc-300"
           value={statusSelection}
-          onChange={(e) => setStatusSelection(e.target.value)}
+          onChange={function handleStatusChange(event) {
+            setStatusSelection(event.target.value);
+            setPage(1);
+          }}
         >
           <option value="all_statuses">All statuses</option>
 
@@ -451,7 +502,10 @@ function Tasks() {
         <select
           className="h-9 cursor-pointer rounded-xl border border-zinc-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-zinc-300"
           value={prioritySelection}
-          onChange={(e) => setPrioritySelection(e.target.value)}
+          onChange={function handlePriorityChange(event) {
+            setPrioritySelection(event.target.value);
+            setPage(1);
+          }}
         >
           <option value="all_priorities">All priorities</option>
 
@@ -465,7 +519,10 @@ function Tasks() {
         <select
           className="h-9 cursor-pointer rounded-xl border border-zinc-200 bg-white px-4 text-sm text-slate-700 outline-none focus:border-zinc-300"
           value={sortByFilter}
-          onChange={(e) => setSortByFilter(e.target.value)}
+          onChange={function handleSortChange(event) {
+            setSortByFilter(event.target.value);
+            setPage(1);
+          }}
         >
           <option value="sort_by_due_date">Sort by due date</option>
 
@@ -482,7 +539,7 @@ function Tasks() {
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className={`px-5 py-3 text-left text-xs font-medium text-slate-500 ${
+                    className={`px-3.5 py-3 text-left text-xs font-medium text-slate-500 ${
                       header.id === "select" ? "w-10" : ""
                     }`}
                   >
@@ -515,6 +572,92 @@ function Tasks() {
             ))}
           </tbody>
         </table>
+        {/* Pagination */}
+        <div className="flex flex-col gap-3 border-t border-zinc-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          {/* Result count */}
+          <p className="text-[12.5px] text-slate-700 ">
+            Showing{" "}
+            <span className="font-medium text-foreground">{startItem}</span>
+            {"–"}
+            <span className="font-medium text-foreground">{endItem}</span>
+            {" of "}
+            <span className="font-medium text-foreground">{totalCount}</span>
+            {" tasks"}
+          </p>
+
+          {/* Pagination */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={function goToPreviousPage() {
+                setPage(function updatePage(currentPage) {
+                  return Math.max(currentPage - 1, 1);
+                });
+              }}
+              disabled={page === 1 || isFetching}
+              className="inline-flex h-7 items-center rounded-lg border border-border px-2 text-[13px] font-medium transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+            >
+              <LucideChevronLeft size={15} />
+            </button>
+
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, function (_, index) {
+                const pageNumber = index + 1;
+
+                if (
+                  totalPages > 4 &&
+                  pageNumber !== 1 &&
+                  pageNumber !== totalPages &&
+                  Math.abs(pageNumber - page) > 1
+                ) {
+                  if (pageNumber === 2 || pageNumber === totalPages - 1) {
+                    return (
+                      <span
+                        key={pageNumber}
+                        className="flex h-8 w-8 items-center justify-center text-sm text-muted-foreground text-[12px]"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+
+                  return null;
+                }
+
+                return (
+                  <button
+                    key={pageNumber}
+                    type="button"
+                    onClick={function goToPage() {
+                      setPage(pageNumber);
+                    }}
+                    disabled={isFetching}
+                    className={`h-7 min-w-7 border border-zinc-200 rounded-lg px-2 text-[12px] font-medium transition-colors ${
+                      page === pageNumber
+                        ? " bg-slate-100 text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={function goToNextPage() {
+                setPage(function updatePage(currentPage) {
+                  return Math.min(currentPage + 1, totalPages);
+                });
+              }}
+              disabled={page >= totalPages || isFetching}
+              className="inline-flex h-7 items-center rounded-lg border border-border px-2 text-[13px] font-medium transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
+            >
+              <LucideChevronRight size={15} />
+            </button>
+          </div>
+        </div>
 
         {/* Create/Edit Task Modal */}
         {isFormOpen && (

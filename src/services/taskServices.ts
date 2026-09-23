@@ -1,8 +1,32 @@
 import { supabase } from "../lib/supabase";
 import type { CreateTaskData, Task } from "../types/task";
 
-export async function getTasks(): Promise<Task[]> {
-  const { data: tasks, error } = await supabase
+export type GetTasksParams = {
+  page: number;
+  pageSize: number;
+  search?: string;
+  projectId?: string;
+  status?: Task["status"];
+  priority?: Task["priority"];
+  sortBy?: "due_date" | "priority";
+};
+
+export async function getTasks({
+  page,
+  pageSize,
+  search = "",
+  projectId,
+  status,
+  priority,
+  sortBy = "due_date",
+}: GetTasksParams): Promise<{
+  tasks: Task[];
+  totalCount: number;
+}> {
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase
     .from("tasks")
     .select(
       `
@@ -12,14 +36,58 @@ export async function getTasks(): Promise<Task[]> {
         full_name
       )
     `,
-    )
-    .order("created_at", { ascending: false });
+      { count: "exact" },
+    );
+
+  // Search by task title
+  if (search.trim()) {
+    query = query.ilike("title", `%${search.trim()}%`);
+  }
+
+  // Project filter
+  if (projectId) {
+    query = query.eq("project_id", projectId);
+  }
+
+  // Status filter
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  // Priority filter
+  if (priority) {
+    query = query.eq("priority", priority);
+  }
+
+  // Sorting
+  if (sortBy === "priority") {
+    query = query.order("priority", {
+      ascending: false,
+    });
+  } else {
+    query = query.order("due_date", {
+      ascending: true,
+      nullsFirst: false,
+    });
+  }
+
+  // Secondary sort so ordering is stable
+  query = query.order("created_at", {
+    ascending: false,
+  });
+
+  // Fetch only the requested page
+  const { data: tasks, count, error } = await query.range(from, to);
 
   if (error) {
+    console.error("Get tasks error:", error);
     throw new Error("Task could not be loaded");
   }
 
-  return tasks;
+  return {
+    tasks: tasks ?? [],
+    totalCount: count ?? 0,
+  };
 }
 
 export async function getTaskStats(projectId: string) {
