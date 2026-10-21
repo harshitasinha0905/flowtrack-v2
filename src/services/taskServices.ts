@@ -11,6 +11,18 @@ export type GetTasksParams = {
   sortBy?: "due_date" | "priority";
 };
 
+export type CalendarTask = {
+  id: string;
+  title: string;
+  status: Task["status"];
+  priority: Task["priority"];
+  due_date: string | null;
+  project_id: string;
+  projects: {
+    name: string;
+  }[] | null;
+};
+
 export async function getTasks({
   page,
   pageSize,
@@ -236,4 +248,29 @@ export async function searchTasks(searchTerm: string) {
   }
 
   return data;
+}
+
+export async function getCalendarTasks(): Promise<CalendarTask[]> {
+  const { data: tasks, error } = await supabase
+    .from("tasks")
+    .select(
+      `
+      id,
+      title,
+      status,
+      priority,
+      due_date,
+      project_id,
+      projects(name)
+    `,
+    )
+    .not("due_date", "is", null)
+    .order("due_date", { ascending: true });
+
+  if (error) {
+    console.error("Calendar tasks error:", error);
+    throw new Error("Calendar tasks could not be loaded");
+  }
+
+  return (tasks ?? []) as CalendarTask[];
 }

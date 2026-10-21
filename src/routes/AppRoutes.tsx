@@ -11,6 +11,7 @@ import Login from "../pages/Login";
 import NotFoundPage from "../pages/NotFoundPage";
 import ProjectDetails from "../pages/ProjectDetails";
 import Signup from "../pages/SignUp";
+import Calendar from "../pages/Calendar";
 
 export default function AppRoutes() {
   return (
@@ -27,6 +28,7 @@ export default function AppRoutes() {
           <Route path="/projects/:projectId" element={<ProjectDetails />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/team" element={<Team />} />
+          <Route path="/calendar" element={<Calendar />} />
         </Route>
       </Route>
 

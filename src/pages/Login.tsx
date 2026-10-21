@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
+import { supabase } from "../lib/supabase";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -35,6 +36,37 @@ function Login() {
         error instanceof Error
           ? error.message
           : "Unable to sign in. Please try again.",
+      );
+    }
+  }
+
+  async function handleDemoLogin() {
+    try {
+      const response = await fetch("/api/demo-login", {
+        method: "POST",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to open demo.");
+      }
+
+      const { error } = await supabase.auth.setSession({
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      navigate("/");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to open the demo. Please try again.",
       );
     }
   }
@@ -89,6 +121,15 @@ function Login() {
           <Button type="submit" className="h-11 w-full" disabled={isSubmitting}>
             {isSubmitting ? "Signing in..." : "Sign In"}
           </Button>
+          <div className="mt-4">
+            <Button
+              type="button"
+              className="h-11 w-full"
+              onClick={handleDemoLogin}
+            >
+              Explore Demo
+            </Button>
+          </div>
         </form>
         <p className="mt-6 text-center text-sm text-slate-500">
           Don't have an account?{" "}

@@ -1,7 +1,7 @@
 import { ArrowLeft, Loader2, Pencil, Sparkles } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
-import { useState } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
 
 import {
   getProjectById,
@@ -89,6 +89,7 @@ function KanbanTaskCard({
 
   return (
     <div
+      id={`kanban-task-${task.id}`}
       ref={ref}
       onClick={() => {
         if (!isDragging) {
@@ -183,9 +184,36 @@ function KanbanColumn({
 function ProjectDetails() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState("overview");
+  const openTaskId = location.state?.openTaskId as string | undefined;
+
+  const [activeTab, setActiveTab] = useState(
+    openTaskId ? "kanban" : "overview",
+  );
+
+  useEffect(
+    function scrollToHighlightedTask() {
+      if (activeTab !== "kanban" || !openTaskId) {
+        return;
+      }
+
+      const animationFrame = requestAnimationFrame(function scrollToCard() {
+        const taskCard = document.getElementById(`kanban-task-${openTaskId}`);
+
+        taskCard?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      });
+
+      return function cleanup() {
+        cancelAnimationFrame(animationFrame);
+      };
+    },
+    [activeTab, openTaskId],
+  );
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -880,7 +908,11 @@ function ProjectDetails() {
                                 setSelectedTask(t);
                                 setIsFormOpen(true);
                               }}
-                              className="cursor-grab rounded-xl border border-zinc-200 bg-white p-3 transition-shadow active:cursor-grabbing hover:shadow-md"
+                              className={`cursor-grab rounded-xl border bg-white p-3 transition-shadow active:cursor-grabbing hover:shadow-md ${
+                                t.id === openTaskId
+                                  ? "golden-ring-highlight"
+                                  : "border-zinc-200"
+                              }`}
                             >
                               {/* Task title */}
                               <div className="text-sm leading-snug text-zinc-900">

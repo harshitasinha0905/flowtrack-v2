@@ -5,6 +5,7 @@ import {
   CheckSquare,
   Users,
   LogOut,
+  CalendarDays,
 } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
@@ -24,6 +25,11 @@ const navigation = [
     name: "Tasks",
     to: "/tasks",
     icon: CheckSquare,
+  },
+  {
+    name: "Calendar",
+    to: "/calendar",
+    icon: CalendarDays,
   },
   {
     name: "Team",
