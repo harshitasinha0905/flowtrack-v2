@@ -121,10 +121,10 @@ function Login() {
           <Button type="submit" className="h-11 w-full" disabled={isSubmitting}>
             {isSubmitting ? "Signing in..." : "Sign In"}
           </Button>
-          <div className="mt-4">
+          <div className="">
             <Button
               type="button"
-              className="h-11 w-full"
+              className="h-10 w-full  rounded-md border border-zinc-300 px-4 py-2 text-zinc-700 hover:bg-zinc-100 bg-white"
               onClick={handleDemoLogin}
             >
               Explore Demo
