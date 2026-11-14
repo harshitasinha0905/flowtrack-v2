@@ -45,3 +45,5 @@ supabase/backup_data.sql
 .DS_Store
 Thumbs.db
 .vscode/
+.vercel
+.env*

@@ -422,7 +422,7 @@ function Tasks() {
         </div>
 
         <div className="flex gap-2">
-          {selectedTaskIds.size > 0 && (
+          {/* {selectedTaskIds.size > 0 && (
             <button
               className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-sm text-red-600 hover:bg-red-100"
               onClick={() => setDeleteConfirmOpen(true)}
@@ -430,7 +430,25 @@ function Tasks() {
               <Trash2 size={16} />
               Delete ({selectedTaskIds.size})
             </button>
-          )}
+          )} */}
+
+          {selectedTaskIds.size > 0 &&
+            [...selectedTaskIds].every((taskId) => {
+              const task = tasks.find((item) => item.id === taskId);
+
+              return (
+                task &&
+                (task.created_by === user?.id || profile?.role === "admin")
+              );
+            }) && (
+              <button
+                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-sm text-red-600 hover:bg-red-100"
+                onClick={() => setDeleteConfirmOpen(true)}
+              >
+                <Trash2 size={16} />
+                Delete ({selectedTaskIds.size})
+              </button>
+            )}
 
           <button
             className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-[11px] bg-zinc-900 px-3 text-sm text-white hover:bg-zinc-800"

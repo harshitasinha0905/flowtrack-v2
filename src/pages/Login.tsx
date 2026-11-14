@@ -8,6 +8,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "sonner";
 import { supabase } from "../lib/supabase";
+import { useState } from "react";
+import { Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -26,6 +28,7 @@ function Login() {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
+  const [isDemoLoading, setIsDemoLoading] = useState(false);
 
   async function onSubmit(data: LoginFormData) {
     try {
@@ -41,6 +44,8 @@ function Login() {
   }
 
   async function handleDemoLogin() {
+    setIsDemoLoading(true);
+
     try {
       const response = await fetch("/api/demo-login", {
         method: "POST",
@@ -68,6 +73,8 @@ function Login() {
           ? error.message
           : "Unable to open the demo. Please try again.",
       );
+    } finally {
+      setIsDemoLoading(false);
     }
   }
 
@@ -122,13 +129,21 @@ function Login() {
             {isSubmitting ? "Signing in..." : "Sign In"}
           </Button>
           <div className="">
-            <Button
+            <button
               type="button"
-              className="h-10 w-full  rounded-md border border-zinc-300 px-4 py-2 text-zinc-700 hover:bg-zinc-100 bg-white"
+              disabled={isDemoLoading}
+              className="w-full rounded-md border border-zinc-300 bg-transparent px-4 py-2 text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={handleDemoLogin}
             >
-              Explore Demo
-            </Button>
+              {isDemoLoading ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Opening Demo...
+                </span>
+              ) : (
+                "Explore Demo"
+              )}
+            </button>
           </div>
         </form>
         <p className="mt-6 text-center text-sm text-slate-500">

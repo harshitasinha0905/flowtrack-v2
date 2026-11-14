@@ -20,6 +20,13 @@ export default async function handler(
   const demoEmail = process.env.DEMO_USER_EMAIL;
   const demoPassword = process.env.DEMO_USER_PASSWORD;
 
+  console.warn("Demo login configuration:", {
+  hasSupabaseUrl: Boolean(supabaseUrl),
+  hasAnonKey: Boolean(supabaseAnonKey),
+  hasDemoEmail: Boolean(demoEmail),
+  hasDemoPassword: Boolean(demoPassword),
+});
+
   if (!supabaseUrl || !supabaseAnonKey || !demoEmail || !demoPassword) {
     return response.status(500).json({
       error: "Demo sign-in is not configured",
@@ -40,7 +47,8 @@ export default async function handler(
   });
 
   if (error || !data.session) {
-    console.error("Demo sign-in failed:", error?.message);
+    // console.error("Demo sign-in failed:", error?.message);
+    console.error("Demo sign-in failed:", error);
 
     return response.status(401).json({
       error: "Demo sign-in failed",
@@ -52,3 +60,8 @@ export default async function handler(
     refresh_token: data.session.refresh_token,
   });
 }
+
+
+
+
+

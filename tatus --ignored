@@ -1,0 +1,156 @@
+warning: in the working copy of '.gitignore', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/.gitignore b/.gitignore[m
+[1mindex bbc0e9b..a3153f9 100644[m
+[1m--- a/.gitignore[m
+[1m+++ b/.gitignore[m
+[36m@@ -44,4 +44,6 @@[m [msupabase/backup_data.sql[m
+ # OS/editor files[m
+ .DS_Store[m
+ Thumbs.db[m
+[31m-.vscode/[m
+\ No newline at end of file[m
+[32m+[m[32m.vscode/[m
+[32m+[m[32m.vercel[m
+[32m+[m[32m.env*[m
+[1mdiff --git a/api/demo-login.ts b/api/demo-login.ts[m
+[1mindex b2990de..f97b6e2 100644[m
+[1m--- a/api/demo-login.ts[m
+[1m+++ b/api/demo-login.ts[m
+[36m@@ -20,6 +20,13 @@[m [mexport default async function handler([m
+   const demoEmail = process.env.DEMO_USER_EMAIL;[m
+   const demoPassword = process.env.DEMO_USER_PASSWORD;[m
+ [m
+[32m+[m[32m  console.warn("Demo login configuration:", {[m
+[32m+[m[32m  hasSupabaseUrl: Boolean(supabaseUrl),[m
+[32m+[m[32m  hasAnonKey: Boolean(supabaseAnonKey),[m
+[32m+[m[32m  hasDemoEmail: Boolean(demoEmail),[m
+[32m+[m[32m  hasDemoPassword: Boolean(demoPassword),[m
+[32m+[m[32m});[m
+[32m+[m
+   if (!supabaseUrl || !supabaseAnonKey || !demoEmail || !demoPassword) {[m
+     return response.status(500).json({[m
+       error: "Demo sign-in is not configured",[m
+[36m@@ -40,7 +47,8 @@[m [mexport default async function handler([m
+   });[m
+ [m
+   if (error || !data.session) {[m
+[31m-    console.error("Demo sign-in failed:", error?.message);[m
+[32m+[m[32m    // console.error("Demo sign-in failed:", error?.message);[m
+[32m+[m[32m    console.error("Demo sign-in failed:", error);[m
+ [m
+     return response.status(401).json({[m
+       error: "Demo sign-in failed",[m
+[36m@@ -52,3 +60,8 @@[m [mexport default async function handler([m
+     refresh_token: data.session.refresh_token,[m
+   });[m
+ }[m
+[41m+[m
+[41m+[m
+[41m+[m
+[41m+[m
+[41m+[m
+[1mdiff --git a/src/pages/Login.tsx b/src/pages/Login.tsx[m
+[1mindex 69fc9b3..108d1b7 100644[m
+[1m--- a/src/pages/Login.tsx[m
+[1m+++ b/src/pages/Login.tsx[m
+[36m@@ -8,6 +8,8 @@[m [mimport { Link, useNavigate } from "react-router-dom";[m
+ import { useAuth } from "../context/AuthContext";[m
+ import { toast } from "sonner";[m
+ import { supabase } from "../lib/supabase";[m
+[32m+[m[32mimport { useState } from "react";[m
+[32m+[m[32mimport { Loader2 } from "lucide-react";[m
+ [m
+ const loginSchema = z.object({[m
+   email: z.string().email("Please enter a valid email address"),[m
+[36m@@ -26,6 +28,7 @@[m [mfunction Login() {[m
+   } = useForm<LoginFormData>({[m
+     resolver: zodResolver(loginSchema),[m
+   });[m
+[32m+[m[32m  const [isDemoLoading, setIsDemoLoading] = useState(false);[m
+ [m
+   async function onSubmit(data: LoginFormData) {[m
+     try {[m
+[36m@@ -41,6 +44,8 @@[m [mfunction Login() {[m
+   }[m
+ [m
+   async function handleDemoLogin() {[m
+[32m+[m[32m    setIsDemoLoading(true);[m
+[32m+[m
+     try {[m
+       const response = await fetch("/api/demo-login", {[m
+         method: "POST",[m
+[36m@@ -68,6 +73,8 @@[m [mfunction Login() {[m
+           ? error.message[m
+           : "Unable to open the demo. Please try again.",[m
+       );[m
+[32m+[m[32m    } finally {[m
+[32m+[m[32m      setIsDemoLoading(false);[m
+     }[m
+   }[m
+ [m
+[36m@@ -122,13 +129,21 @@[m [mfunction Login() {[m
+             {isSubmitting ? "Signing in..." : "Sign In"}[m
+           </Button>[m
+           <div className="">[m
+[31m-            <Button[m
+[32m+[m[32m            <button[m
+               type="button"[m
+[31m-              className="h-10 w-full  rounded-md border border-zinc-300 px-4 py-2 text-zinc-700 hover:bg-zinc-100 bg-white"[m
+[32m+[m[32m              disabled={isDemoLoading}[m
+[32m+[m[32m              className="w-full rounded-md border border-zinc-300 bg-transparent px-4 py-2 text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"[m
+               onClick={handleDemoLogin}[m
+             >[m
+[31m-              Explore Demo[m
+[31m-            </Button>[m
+[32m+[m[32m              {isDemoLoading ? ([m
+[32m+[m[32m                <span className="inline-flex items-center justify-center gap-2">[m
+[32m+[m[32m                  <Loader2 className="h-4 w-4 animate-spin" />[m
+[32m+[m[32m                  Opening Demo...[m
+[32m+[m[32m                </span>[m
+[32m+[m[32m              ) : ([m
+[32m+[m[32m                "Explore Demo"[m
+[32m+[m[32m              )}[m
+[32m+[m[32m            </button>[m
+           </div>[m
+         </form>[m
+         <p className="mt-6 text-center text-sm text-slate-500">[m
+[1mdiff --git a/src/pages/Tasks.tsx b/src/pages/Tasks.tsx[m
+[1mindex 84b6f09..633f5ac 100644[m
+[1m--- a/src/pages/Tasks.tsx[m
+[1m+++ b/src/pages/Tasks.tsx[m
+[36m@@ -422,7 +422,7 @@[m [mfunction Tasks() {[m
+         </div>[m
+ [m
+         <div className="flex gap-2">[m
+[31m-          {selectedTaskIds.size > 0 && ([m
+[32m+[m[32m          {/* {selectedTaskIds.size > 0 && ([m
+             <button[m
+               className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-sm text-red-600 hover:bg-red-100"[m
+               onClick={() => setDeleteConfirmOpen(true)}[m
+[36m@@ -430,7 +430,25 @@[m [mfunction Tasks() {[m
+               <Trash2 size={16} />[m
+               Delete ({selectedTaskIds.size})[m
+             </button>[m
+[31m-          )}[m
+[32m+[m[32m          )} */}[m
+[32m+[m
+[32m+[m[32m          {selectedTaskIds.size > 0 &&[m
+[32m+[m[32m            [...selectedTaskIds].every((taskId) => {[m
+[32m+[m[32m              const task = tasks.find((item) => item.id === taskId);[m
+[32m+[m
+[32m+[m[32m              return ([m
+[32m+[m[32m                task &&[m
+[32m+[m[32m                (task.created_by === user?.id || profile?.role === "admin")[m
+[32m+[m[32m              );[m
+[32m+[m[32m            }) && ([m
+[32m+[m[32m              <button[m
+[32m+[m[32m                className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 text-sm text-red-600 hover:bg-red-100"[m
+[32m+[m[32m                onClick={() => setDeleteConfirmOpen(true)}[m
+[32m+[m[32m              >[m
+[32m+[m[32m                <Trash2 size={16} />[m
+[32m+[m[32m                Delete ({selectedTaskIds.size})[m
+[32m+[m[32m              </button>[m
+[32m+[m[32m            )}[m
+ [m
+           <button[m
+             className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-[11px] bg-zinc-900 px-3 text-sm text-white hover:bg-zinc-800"[m
